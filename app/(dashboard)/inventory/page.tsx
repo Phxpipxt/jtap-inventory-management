@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useInventory } from "@/hooks/useInventory";
@@ -19,7 +19,7 @@ import { AssetHistoryModal } from "@/components/modals/AssetHistoryModal";
 import { useAuth } from "@/context/AuthContext";
 import { Eye } from "lucide-react";
 
-export default function InventoryPage() {
+function InventoryContent() {
     const { assets, logs, loading, addAsset, updateAsset, deleteAsset, deleteAssets } = useInventory();
     const { user } = useAuth();
     const searchParams = useSearchParams();
@@ -1062,5 +1062,13 @@ export default function InventoryPage() {
                 />
             )}
         </div >
+    );
+}
+
+export default function InventoryPage() {
+    return (
+        <Suspense fallback={<div className="flex h-screen items-center justify-center p-8 text-slate-500">Loading inventory...</div>}>
+            <InventoryContent />
+        </Suspense>
     );
 }
