@@ -238,33 +238,31 @@ export default function DisposePage() {
             </div>
 
             {/* Tabs */}
-            <div className="border-b border-slate-200">
-                <nav className="-mb-px flex gap-6" aria-label="Tabs">
-                    <button
-                        onClick={() => { setActiveTab("candidates"); setSearchTerm(""); setSelectedIds(new Set()); }}
-                        className={`border-b-2 py-4 px-1 text-sm font-medium ${activeTab === "candidates"
-                            ? "border-blue-500 text-blue-600"
-                            : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                            }`}
-                    >
-                        Dispose Candidates
-                        <span className="ml-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                            {candidateAssets.length}
-                        </span>
-                    </button>
-                    <button
-                        onClick={() => { setActiveTab("disposed"); setSearchTerm(""); setSelectedIds(new Set()); }}
-                        className={`border-b-2 py-4 px-1 text-sm font-medium ${activeTab === "disposed"
-                            ? "border-blue-500 text-blue-600"
-                            : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                            }`}
-                    >
-                        Disposed Assets
-                        <span className="ml-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                            {disposedAssets.length}
-                        </span>
-                    </button>
-                </nav>
+            <div className="flex p-1 bg-slate-100 rounded-lg w-full md:w-auto self-start md:inline-flex">
+                <button
+                    onClick={() => { setActiveTab("candidates"); setSearchTerm(""); setSelectedIds(new Set()); }}
+                    className={`flex-1 md:flex-none px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 cursor-pointer ${activeTab === "candidates"
+                        ? "bg-white text-blue-700 shadow-sm ring-1 ring-black/5"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                        }`}
+                >
+                    Dispose Candidates
+                    <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${activeTab === "candidates" ? "bg-blue-100 text-blue-800" : "bg-slate-200 text-slate-600"}`}>
+                        {candidateAssets.length}
+                    </span>
+                </button>
+                <button
+                    onClick={() => { setActiveTab("disposed"); setSearchTerm(""); setSelectedIds(new Set()); }}
+                    className={`flex-1 md:flex-none px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 cursor-pointer ${activeTab === "disposed"
+                        ? "bg-white text-red-700 shadow-sm ring-1 ring-black/5"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                        }`}
+                >
+                    Disposed Assets
+                    <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${activeTab === "disposed" ? "bg-red-100 text-red-800" : "bg-slate-200 text-slate-600"}`}>
+                        {disposedAssets.length}
+                    </span>
+                </button>
             </div>
 
             {/* Actions Bar */}

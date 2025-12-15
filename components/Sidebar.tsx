@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { Package, ClipboardCheck, LogOut, History, X, Menu, FileText, Repeat, ChevronDown, ChevronRight, Monitor, Tag, ClipboardList } from "lucide-react";
 import { cn, getAvatarColor } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { TermsPrivacyModal } from "./modals/TermsPrivacyModal";
 
 const navigation = [
     {
@@ -35,6 +36,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
     const [isMobile, setIsMobile] = useState(false);
     const { user, logout } = useAuth();
     const [expandedMenus, setExpandedMenus] = useState<string[]>(["Inventory"]); // Default open Inventory
+    const [modalConfig, setModalConfig] = useState<{ isOpen: boolean; type: "terms" | "privacy" }>({ isOpen: false, type: "terms" });
 
     // Handle responsive state
     useEffect(() => {
@@ -297,9 +299,19 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
                             <div className="text-center">
                                 <p>&copy; {new Date().getFullYear()} JTAP Inventory</p>
                                 <div className="flex justify-center gap-2">
-                                    <Link href="/terms" className="hover:text-slate-300">Terms</Link>
+                                    <button
+                                        onClick={() => setModalConfig({ isOpen: true, type: "terms" })}
+                                        className="hover:text-slate-300 cursor-pointer"
+                                    >
+                                        Terms
+                                    </button>
                                     <span>&bull;</span>
-                                    <Link href="/privacy" className="hover:text-slate-300">Privacy</Link>
+                                    <button
+                                        onClick={() => setModalConfig({ isOpen: true, type: "privacy" })}
+                                        className="hover:text-slate-300 cursor-pointer"
+                                    >
+                                        Privacy
+                                    </button>
                                 </div>
                                 <p className="mt-1">Develop by <span className="text-slate-400">Phupipat Jimjuan</span></p>
                                 <p className="mt-1">Management Information System</p>
@@ -308,6 +320,11 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
                     )}
                 </div>
             </div>
+            <TermsPrivacyModal
+                isOpen={modalConfig.isOpen}
+                onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
+                type={modalConfig.type}
+            />
         </>
     );
 }

@@ -223,14 +223,7 @@ export default function AuditHistoryPage() {
             />
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <h1 className="text-2xl font-bold text-slate-800">Audit History</h1>
-                <button
-                    onClick={handleExportHistory}
-                    className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700 shadow-sm md:w-auto cursor-pointer"
-                    title="Export Audit History to Excel"
-                >
-                    <Upload className="h-4 w-4" />
-                    Export History
-                </button>
+
             </div>
 
             <div className="rounded-lg bg-white p-3 shadow-sm md:p-6">
@@ -277,6 +270,17 @@ export default function AuditHistoryPage() {
                             Clear Filter
                         </button>
                     )}
+
+                    <div className="flex-1"></div>
+
+                    <button
+                        onClick={handleExportHistory}
+                        className="flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 shadow-sm md:w-auto cursor-pointer whitespace-nowrap"
+                        title="Export Audit History to Excel"
+                    >
+                        <Upload className="h-4 w-4" />
+                        Export History
+                    </button>
                 </div>
 
                 {/* Mobile Card View */}

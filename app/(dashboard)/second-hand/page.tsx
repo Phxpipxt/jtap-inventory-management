@@ -93,13 +93,7 @@ export default function SecondHandPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Second-hand Assets</h1>
                     <p className="text-sm text-slate-500">Assets that have been previously assigned and returned.</p>
                 </div>
-                <button
-                    onClick={handleExport}
-                    className="hidden md:flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 shadow-sm cursor-pointer"
-                >
-                    <Upload className="h-4 w-4" />
-                    Export Report
-                </button>
+
             </div>
 
             <div className="flex flex-col gap-3 rounded-lg bg-white p-4 shadow-md border border-slate-100 md:flex-row md:gap-4">
@@ -115,10 +109,10 @@ export default function SecondHandPage() {
                 </div>
                 <button
                     onClick={handleExport}
-                    className="md:hidden flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 shadow-sm w-full cursor-pointer"
+                    className="flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 shadow-sm md:w-auto w-full cursor-pointer whitespace-nowrap"
                 >
                     <Upload className="h-4 w-4" />
-                    Export
+                    Export Report
                 </button>
             </div>
 
