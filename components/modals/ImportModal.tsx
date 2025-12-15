@@ -88,6 +88,23 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                     }
                     processedKeys.add(key);
 
+                    // Helper to parse dates (handles Excel serial numbers and strings)
+                    const parseDate = (val: any): string | undefined => {
+                        if (!val) return undefined;
+                        if (typeof val === 'number') {
+                            // Excel serial date to JS Date
+                            // Excel base date: Dec 30 1899
+                            const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                            return date.toISOString();
+                        }
+                        // Try parsing string
+                        const date = new Date(val);
+                        if (!isNaN(date.getTime())) {
+                            return date.toISOString();
+                        }
+                        return undefined;
+                    };
+
                     // Add valid asset (will be upserted in context)
                     newAssets.push({
                         id: crypto.randomUUID(),
@@ -103,8 +120,8 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                                     row["Dept"] as Department
                         ) : undefined,
                         status: row["Status"] || "In Stock",
-                        purchaseDate: row["Purchase Date"] || undefined,
-                        warrantyExpiry: row["Warranty"] || undefined,
+                        purchaseDate: parseDate(row["Purchase Date"]),
+                        warrantyExpiry: parseDate(row["Warranty"]),
                         tags: row["Tags"] ? row["Tags"].split(",").map((t: string) => t.trim()) : undefined,
                         remarks: row["Remarks"] || undefined,
                         hdd: row["HDD/SSD"] || undefined,
@@ -197,8 +214,8 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
             { header: "Emp ID", key: "empId", width: 10 },
             { header: "Dept", key: "dept", width: 15 },
             { header: "Status", key: "status", width: 15 },
-            { header: "Purchase Date", key: "purchaseDate", width: 15 },
-            { header: "Warranty", key: "warranty", width: 15 },
+            { header: "Purchase Date", key: "purchaseDate", width: 15, style: { numFmt: 'yyyy-mm-dd' } },
+            { header: "Warranty", key: "warranty", width: 15, style: { numFmt: 'yyyy-mm-dd' } },
             { header: "Tags", key: "tags", width: 25 },
             { header: "Remarks", key: "remarks", width: 25 },
             { header: "HDD/SSD", key: "hdd", width: 15 },

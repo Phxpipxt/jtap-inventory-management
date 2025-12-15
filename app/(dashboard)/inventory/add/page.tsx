@@ -498,19 +498,6 @@ export default function AddAssetPage() {
                             placeholder="e.g. T14 Gen 5"
                         />
                     </div>
-                    {/* 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-700"></label>
-                        <input
-                            type="text"
-                            value={model}
-                            onChange={(e) => setModel(e.target.value)}
-                            className="w-full rounded-md border border-slate-300 px-4 py-3 text-black focus:border-blue-500 focus:outline-none md:py-2 md:text-sm"
-                            placeholder="e.g. T14 Gen 5"
-                        />
-                    </div> */}
-
-
 
                     <div className="space-y-2 min-w-0">
                         <label className="text-sm font-medium text-slate-700">Purchase Date</label>

@@ -3,6 +3,7 @@ import "./globals.css";
 import { InventoryProvider } from "@/context/InventoryContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { SessionTimeout } from "@/components/SessionTimeout";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -35,10 +36,12 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <AuthProvider>
-          <InventoryProvider>
-            <SessionTimeout />
-            {children}
-          </InventoryProvider>
+          <QueryProvider>
+            <InventoryProvider>
+              <SessionTimeout />
+              {children}
+            </InventoryProvider>
+          </QueryProvider>
         </AuthProvider>
       </body>
     </html>

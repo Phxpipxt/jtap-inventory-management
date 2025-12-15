@@ -5,12 +5,25 @@ import { Asset, LogEntry } from "@/lib/types";
 import { useMemo, useState } from "react";
 import { Search, Filter, History, Eye, ArrowUp, ArrowDown, Upload } from "lucide-react";
 import { AssetHistoryModal } from "@/components/modals/AssetHistoryModal";
+import { AlertModal } from "@/components/modals/AlertModal";
+import { TableSkeleton } from "@/components/skeletons/AppSkeletons";
 
 export default function SecondHandPage() {
-    const { assets, logs } = useInventory();
+    const { assets, logs, loading } = useInventory();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+
+    const [alertState, setAlertState] = useState<{ isOpen: boolean; title: string; message: string; type: "default" | "error" | "warning" }>({
+        isOpen: false,
+        title: "",
+        message: "",
+        type: "default",
+    });
+
+    const showAlert = (title: string, message: string, type: "default" | "error" | "warning" = "default") => {
+        setAlertState({ isOpen: true, title, message, type });
+    };
 
     // Filter assets that have 'Check-in' (Return) history, meaning they are second-hand
     const secondHandAssets = useMemo(() => {
@@ -27,7 +40,7 @@ export default function SecondHandPage() {
             asset.computerNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
             asset.serialNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
             asset.model?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        ).sort((a, b) => a.computerNo.localeCompare(b.computerNo));
     }, [secondHandAssets, searchTerm]);
 
     const handleViewHistory = (asset: Asset) => {
@@ -37,7 +50,7 @@ export default function SecondHandPage() {
 
     const handleExport = async () => {
         if (filteredAssets.length === 0) {
-            alert("No assets to export.");
+            showAlert("Export Failed", "No assets to export.", "warning");
             return;
         }
 
@@ -66,9 +79,12 @@ export default function SecondHandPage() {
             XLSX.writeFile(wb, `SecondHand_Export_${new Date().toISOString().split("T")[0]}.xlsx`);
         } catch (error) {
             console.error("Export failed:", error);
-            alert("Failed to export. Please try again.");
+            showAlert("Export Failed", "Failed to export. Please try again.", "error");
         }
     };
+
+
+    if (loading) return <TableSkeleton />;
 
     return (
         <div className="space-y-6 pb-20 md:pb-0">
@@ -171,7 +187,7 @@ export default function SecondHandPage() {
                                 <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Asset Info</th>
                                 <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Current Status</th>
                                 <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Last Return</th>
-                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500"></th>
+                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
@@ -246,6 +262,14 @@ export default function SecondHandPage() {
                     }}
                 />
             )}
+
+            <AlertModal
+                isOpen={alertState.isOpen}
+                onClose={() => setAlertState({ ...alertState, isOpen: false })}
+                title={alertState.title}
+                message={alertState.message}
+                type={alertState.type}
+            />
         </div>
     );
 }

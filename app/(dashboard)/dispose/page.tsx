@@ -3,17 +3,52 @@
 import { useInventory } from "@/hooks/useInventory";
 import { Asset } from "@/lib/types";
 import { useMemo, useState } from "react";
-import { Search, History } from "lucide-react";
 import { AssetHistoryModal } from "@/components/modals/AssetHistoryModal";
+import { AssetDetailModal } from "@/components/modals/AssetDetailModal";
+import { AlertModal } from "@/components/modals/AlertModal";
+import { Eye, Search, History, Upload, Trash2, AlertTriangle, CheckSquare, Square, X, CheckCircle2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { TableSkeleton } from "@/components/skeletons/AppSkeletons";
 
 export default function DisposePage() {
-    const { assets } = useInventory();
+    const { assets, logs, updateAsset, loading } = useInventory(); // Ensure updateAsset is available
+    const { user } = useAuth();
     const [searchTerm, setSearchTerm] = useState("");
+    const [activeTab, setActiveTab] = useState<"candidates" | "disposed">("candidates");
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
-    // Filter assets for disposal: > 5 years old AND In Stock
-    const disposeAssets = useMemo(() => {
+    const [recentlyDisposedAssets, setRecentlyDisposedAssets] = useState<Asset[] | null>(null);
+    const [targetDisposeIds, setTargetDisposeIds] = useState<Set<string> | null>(null);
+    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+
+    // Initiate bulk dispose
+    const handleBulkDisposeClick = () => {
+        setTargetDisposeIds(selectedIds);
+        setConfirmModalOpen(true);
+    };
+
+    // Initiate single dispose
+    const handleSingleDisposeClick = (id: string) => {
+        setTargetDisposeIds(new Set([id]));
+        setConfirmModalOpen(true);
+    };
+
+    const [alertState, setAlertState] = useState<{ isOpen: boolean; title: string; message: string | React.ReactNode; type: "default" | "error" | "warning" | "success" }>({
+        isOpen: false,
+        title: "",
+        message: "",
+        type: "default",
+    });
+
+    const showAlert = (title: string, message: string | React.ReactNode, type: "default" | "error" | "warning" | "success" = "default") => {
+        setAlertState({ isOpen: true, title, message, type });
+    };
+
+    // Filter assets for disposal candidates: > 5 years old AND In Stock
+    const candidateAssets = useMemo(() => {
         const now = new Date();
         const fiveYearsAgo = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
 
@@ -26,18 +61,19 @@ export default function DisposePage() {
         });
     }, [assets]);
 
+    // Filter disposed assets
+    const disposedAssets = useMemo(() => {
+        return assets.filter(asset => asset.status === "Disposed");
+    }, [assets]);
+
     const filteredAssets = useMemo(() => {
-        return disposeAssets.filter(asset =>
+        const sourceList = activeTab === "candidates" ? candidateAssets : disposedAssets;
+        return sourceList.filter(asset =>
             asset.computerNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
             asset.serialNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
             asset.model?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [disposeAssets, searchTerm]);
-
-    const handleViewHistory = (asset: Asset) => {
-        setSelectedAsset(asset);
-        setIsHistoryModalOpen(true);
-    };
+        ).sort((a, b) => a.computerNo.localeCompare(b.computerNo));
+    }, [activeTab, candidateAssets, disposedAssets, searchTerm]);
 
     const calculateAge = (purchaseDateStr?: string) => {
         if (!purchaseDateStr) return "N/A";
@@ -48,15 +84,190 @@ export default function DisposePage() {
         return `${diffYears} Years`;
     };
 
+    const handleSelectAll = () => {
+        if (selectedIds.size === filteredAssets.length) {
+            setSelectedIds(new Set());
+        } else {
+            const newSelected = new Set(filteredAssets.map(a => a.id));
+            setSelectedIds(newSelected);
+        }
+    };
+
+    const handleSelectRow = (id: string) => {
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedIds(newSelected);
+    };
+
+
+
+    const confirmDispose = async () => {
+        if (!user || !targetDisposeIds) return;
+
+        const assetsToDispose = assets.filter(a => targetDisposeIds.has(a.id));
+
+        // Process serially
+        for (const asset of assetsToDispose) {
+            await updateAsset(
+                { ...asset, status: "Disposed" },
+                user.name,
+                "Update",
+                "Asset Disposed"
+            );
+        }
+
+        // Update selection logic
+        if (targetDisposeIds === selectedIds) {
+            setSelectedIds(new Set());
+        }
+        else {
+            const newSelected = new Set(selectedIds);
+            for (const id of targetDisposeIds) {
+                newSelected.delete(id);
+            }
+            setSelectedIds(newSelected);
+        }
+
+        setTargetDisposeIds(null);
+        setConfirmModalOpen(false);
+
+        // Show custom success modal with the list
+        setRecentlyDisposedAssets(assetsToDispose);
+        setActiveTab("disposed");
+    };
+
+    const handleExport = async () => {
+        if (filteredAssets.length === 0) {
+            showAlert("Export Failed", "No assets to export.", "warning");
+            return;
+        }
+
+        try {
+            const XLSX = await import("xlsx");
+            const data = filteredAssets.map((asset) => {
+                const baseData = {
+                    "Computer No.": asset.computerNo,
+                    "Serial No.": asset.serialNo,
+                    "Brand": asset.brand || "-",
+                    "Model": asset.model || "-",
+                    "Status": asset.status,
+                    "Age": calculateAge(asset.purchaseDate),
+                    "Purchase Date": asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : "-",
+                };
+
+                if (activeTab === "disposed") {
+                    // Find the last "In Use" context from logs
+                    const assetLogs = logs.filter(l => l.assetId === asset.id).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+                    let lastUsedBy = "-";
+                    let lastEmpId = "-";
+
+                    // Look for the most recent relevant log
+                    const lastUsageLog = assetLogs.find(l =>
+                        l.action === "Check-in" || l.action === "Check-out"
+                    );
+
+                    if (lastUsageLog) {
+                        const details = lastUsageLog.details || "";
+                        if (lastUsageLog.action === "Check-out" && details.startsWith("Assigned to")) {
+                            const nameMatch = details.match(/Assigned to (.*?)\s+\(/);
+                            if (nameMatch) lastUsedBy = nameMatch[1];
+                            const idMatch = details.match(/ID: (.*?),/);
+                            if (idMatch) lastEmpId = idMatch[1];
+                        } else if (lastUsageLog.action === "Check-in" && details.startsWith("Returned from")) {
+                            const namePart = details.split(" (Distributed:")[0];
+                            const nameMatch = namePart.replace("Returned from ", "");
+                            lastUsedBy = nameMatch;
+                        }
+                    }
+                    if (lastUsedBy === "-" && asset.owner) lastUsedBy = asset.owner;
+                    if (lastEmpId === "-" && asset.empId) lastEmpId = asset.empId;
+
+                    return {
+                        ...baseData,
+                        "Disposed Date": new Date(asset.lastUpdated).toLocaleDateString(),
+                        "Last Used By": lastUsedBy,
+                        "Last Emp ID": lastEmpId
+                    };
+                } else {
+                    // Candidates
+                    return {
+                        ...baseData,
+                        "Current Location": "In Stock",
+                    };
+                }
+            });
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            const sheetName = activeTab === "disposed" ? "Disposed Assets" : "Dispose Candidates";
+            const fileName = activeTab === "disposed" ? "Disposed_Assets" : "Dispose_Candidates";
+
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            XLSX.writeFile(wb, `${fileName}_${new Date().toISOString().split("T")[0]}.xlsx`);
+        } catch (error) {
+            console.error(error);
+            showAlert("Error", "Failed to export data", "error");
+        }
+    };
+
+    const handleViewHistory = (asset: Asset) => {
+        setSelectedAsset(asset);
+        setIsHistoryModalOpen(true);
+    };
+
+    const handleViewDetails = (asset: Asset) => {
+        setSelectedAsset(asset);
+        setIsViewModalOpen(true);
+    };
+
+
+    if (loading) return <TableSkeleton />;
+
     return (
         <div className="space-y-6 pb-20 md:pb-0">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Dispose Candidates</h1>
-                    <p className="text-sm text-slate-500">Assets older than 5 years that have been returned (In Stock).</p>
+                    <h1 className="text-2xl font-bold text-slate-900">Asset Disposal</h1>
+                    <p className="text-sm text-slate-500">Manage assets eligible for disposal and view disposal history.</p>
                 </div>
             </div>
 
+            {/* Tabs */}
+            <div className="border-b border-slate-200">
+                <nav className="-mb-px flex gap-6" aria-label="Tabs">
+                    <button
+                        onClick={() => { setActiveTab("candidates"); setSearchTerm(""); setSelectedIds(new Set()); }}
+                        className={`border-b-2 py-4 px-1 text-sm font-medium ${activeTab === "candidates"
+                            ? "border-blue-500 text-blue-600"
+                            : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                            }`}
+                    >
+                        Dispose Candidates
+                        <span className="ml-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                            {candidateAssets.length}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => { setActiveTab("disposed"); setSearchTerm(""); setSelectedIds(new Set()); }}
+                        className={`border-b-2 py-4 px-1 text-sm font-medium ${activeTab === "disposed"
+                            ? "border-blue-500 text-blue-600"
+                            : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                            }`}
+                    >
+                        Disposed Assets
+                        <span className="ml-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                            {disposedAssets.length}
+                        </span>
+                    </button>
+                </nav>
+            </div>
+
+            {/* Actions Bar */}
             <div className="flex flex-col gap-3 rounded-lg bg-white p-4 shadow-md border border-slate-100 md:flex-row md:gap-4">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -68,79 +279,75 @@ export default function DisposePage() {
                         className="w-full rounded-md border border-slate-300 pl-10 pr-4 py-2 text-black placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                 </div>
-            </div>
 
-            {/* Mobile View (Cards) */}
-            <div className="grid gap-4 md:hidden">
-                {filteredAssets.length === 0 ? (
-                    <div className="rounded-lg bg-white p-8 text-center text-sm text-slate-500 shadow-sm border border-slate-200">
-                        No assets found for disposal.
-                    </div>
-                ) : (
-                    filteredAssets.map((asset) => (
-                        <div key={asset.id} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 space-y-3">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <div className="font-semibold text-slate-900">{asset.computerNo}</div>
-                                    <div className="text-xs text-slate-500 mt-1">S/N : {asset.serialNo}</div>
-                                    <div className="text-xs text-slate-500">Model : {asset.brand} {asset.model}</div>
-                                </div>
-                                <span className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-red-800">
-                                    Can Dispose
-                                </span>
-                            </div>
+                {activeTab === "candidates" && selectedIds.size > 0 && (
+                    <button
+                        onClick={handleBulkDisposeClick}
+                        className="flex items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 shadow-sm cursor-pointer animate-in fade-in"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        Dispose Selected ({selectedIds.size})
+                    </button>
+                )}
 
-                            <div className="border-t border-slate-100 pt-3 flex justify-between items-center">
-                                <div>
-                                    <p className="text-xs font-semibold text-slate-500">Age</p>
-                                    <p className="text-sm font-medium text-slate-900">{calculateAge(asset.purchaseDate)}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs font-semibold text-slate-500">Status</p>
-                                    <p className="text-sm font-medium text-slate-900">{asset.status}</p>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={() => handleViewHistory(asset)}
-                                className="w-full flex items-center justify-center gap-2 rounded-md bg-slate-100 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
-                                title="View usage history"
-                            >
-                                <History className="h-4 w-4" />
-                                View History
-                            </button>
-                        </div>
-                    ))
+                {(activeTab === "candidates" || activeTab === "disposed") && (
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 shadow-sm cursor-pointer"
+                    >
+                        <Upload className="h-4 w-4" />
+                        Export Report
+                    </button>
                 )}
             </div>
 
-            {/* Desktop View (Table) */}
+            {/* Table View */}
             <div className="hidden md:block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200">
                         <thead className="bg-slate-50">
                             <tr>
+                                {activeTab === "candidates" && (
+                                    <th className="px-6 py-3 text-left" style={{ width: "50px" }}>
+                                        <input
+                                            type="checkbox"
+                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            checked={filteredAssets.length > 0 && selectedIds.size === filteredAssets.length}
+                                            onChange={handleSelectAll}
+                                        />
+                                    </th>
+                                )}
                                 <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Asset Info</th>
                                 <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Age</th>
                                 <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
-                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500"></th>
+                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
                             {filteredAssets.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-500">
-                                        No assets found for disposal.
+                                    <td colSpan={activeTab === "candidates" ? 5 : 4} className="px-6 py-8 text-center text-sm text-slate-500">
+                                        No assets found.
                                     </td>
                                 </tr>
                             ) : (
                                 filteredAssets.map((asset) => (
-                                    <tr key={asset.id} className="hover:bg-slate-50 transition-colors">
+                                    <tr key={asset.id} className={`hover:bg-slate-50 transition-colors ${selectedIds.has(asset.id) ? "bg-blue-50" : ""}`}>
+                                        {activeTab === "candidates" && (
+                                            <td className="px-6 py-4">
+                                                <input
+                                                    type="checkbox"
+                                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                    checked={selectedIds.has(asset.id)}
+                                                    onChange={() => handleSelectRow(asset.id)}
+                                                />
+                                            </td>
+                                        )}
                                         <td className="whitespace-nowrap px-6 py-4">
                                             <div className="flex items-center">
                                                 <div>
                                                     <div className="font-semibold text-slate-900">{asset.computerNo}</div>
-                                                    <div className="text-xs text-slate-500">S/N : {asset.serialNo}</div>
+                                                    <div className="text-xs text-slate-500">S/N: {asset.serialNo}</div>
                                                     <div className="text-xs text-slate-500">{asset.brand} {asset.model}</div>
                                                 </div>
                                             </div>
@@ -149,24 +356,42 @@ export default function DisposePage() {
                                             {calculateAge(asset.purchaseDate)}
                                         </td>
                                         <td className="whitespace-nowrap px-6 py-4">
-                                            <div className="flex gap-2">
-                                                <span className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-green-800">
-                                                    {asset.status}
-                                                </span>
-                                                <span className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-red-800">
-                                                    Can Dispose
-                                                </span>
-                                            </div>
+                                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold leading-5 ${asset.status === "Disposed"
+                                                ? "bg-slate-600 text-white"
+                                                : "bg-red-100 text-red-800"
+                                                }`}>
+                                                {asset.status === "In Stock" ? "Can Dispose" : asset.status}
+                                            </span>
                                         </td>
                                         <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                                            <button
-                                                onClick={() => handleViewHistory(asset)}
-                                                className="inline-flex items-center gap-1 rounded bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
-                                                title="View usage history"
-                                            >
-                                                <History className="h-3.5 w-3.5" />
-                                                View History
-                                            </button>
+                                            <div className="flex items-center justify-end gap-2">
+                                                {activeTab === "candidates" && (
+                                                    <button
+                                                        onClick={() => handleSingleDisposeClick(asset.id)}
+                                                        className="inline-flex items-center gap-1 rounded bg-red-50 text-red-700 px-3 py-1.5 text-xs font-medium hover:bg-red-100 transition-colors cursor-pointer"
+                                                        title="Dispose this item"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                        Dispose
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleViewDetails(asset)}
+                                                    className="inline-flex items-center gap-1 rounded bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                                                    title="View details"
+                                                >
+                                                    <Eye className="h-3.5 w-3.5" />
+                                                    Details
+                                                </button>
+                                                <button
+                                                    onClick={() => handleViewHistory(asset)}
+                                                    className="inline-flex items-center gap-1 rounded bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                                                    title="View usage history"
+                                                >
+                                                    <History className="h-3.5 w-3.5" />
+                                                    History
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -174,6 +399,88 @@ export default function DisposePage() {
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            {/* Mobile View (Cards) */}
+            <div className="grid gap-4 md:hidden">
+                {activeTab === "candidates" && filteredAssets.length > 0 && (
+                    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 shadow-sm">
+                        <input
+                            type="checkbox"
+                            checked={selectedIds.size === filteredAssets.length}
+                            onChange={handleSelectAll}
+                            className="h-5 w-5 rounded border-slate-300 text-blue-600"
+                        />
+                        <span className="text-sm font-medium text-slate-700">Select All</span>
+                    </div>
+                )}
+
+                {filteredAssets.length === 0 ? (
+                    <div className="rounded-lg bg-white p-8 text-center text-sm text-slate-500 border border-slate-200">
+                        No assets found.
+                    </div>
+                ) : (
+                    filteredAssets.map((asset) => (
+                        <div key={asset.id} className={`bg-white p-4 rounded-lg shadow-sm border space-y-3 ${selectedIds.has(asset.id) ? "border-blue-300 bg-blue-50" : "border-slate-200"}`}>
+                            <div className="flex justify-between items-start">
+                                <div className="flex gap-3">
+                                    {activeTab === "candidates" && (
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(asset.id)}
+                                            onChange={() => handleSelectRow(asset.id)}
+                                            className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600"
+                                        />
+                                    )}
+                                    <div>
+                                        <div className="font-semibold text-slate-900">{asset.computerNo}</div>
+                                        <div className="text-xs text-slate-500 mt-1">S/N: {asset.serialNo}</div>
+                                        <div className="text-xs text-slate-500">{asset.brand} {asset.model}</div>
+                                    </div>
+                                </div>
+                                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold leading-5 ${asset.status === "Disposed"
+                                    ? "bg-slate-600 text-white"
+                                    : "bg-red-100 text-red-800"
+                                    }`}>
+                                    {asset.status === "In Stock" ? "Can Dispose" : asset.status}
+                                </span>
+                            </div>
+
+                            <div className="border-t border-slate-100 pt-3 flex justify-between items-center">
+                                <div>
+                                    <p className="text-xs font-semibold text-slate-500">Age</p>
+                                    <p className="text-sm font-medium text-slate-900">{calculateAge(asset.purchaseDate)}</p>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    {activeTab === "candidates" && (
+                                        <button
+                                            onClick={() => handleSingleDisposeClick(asset.id)}
+                                            className="flex items-center gap-1 rounded bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            Dispose
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => handleViewDetails(asset)}
+                                        className="flex items-center gap-1 rounded bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                                    >
+                                        <Eye className="h-3.5 w-3.5" />
+                                        Details
+                                    </button>
+                                    <button
+                                        onClick={() => handleViewHistory(asset)}
+                                        className="flex items-center gap-1 rounded bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 transition-colors"
+                                    >
+                                        <History className="h-3.5 w-3.5" />
+                                        History
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
 
             {selectedAsset && (
@@ -185,6 +492,108 @@ export default function DisposePage() {
                         setSelectedAsset(null);
                     }}
                 />
+            )}
+
+            {selectedAsset && (
+                <AssetDetailModal
+                    asset={selectedAsset}
+                    isOpen={isViewModalOpen}
+                    onClose={() => {
+                        setIsViewModalOpen(false);
+                        setSelectedAsset(null);
+                    }}
+                />
+            )}
+
+            <AlertModal
+                isOpen={alertState.isOpen}
+                onClose={() => setAlertState({ ...alertState, isOpen: false })}
+                title={alertState.title}
+                message={alertState.message}
+                type={alertState.type}
+            />
+
+            {/* Confirmation Modal */}
+            {confirmModalOpen && targetDisposeIds && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl max-h-[90vh] flex flex-col">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-slate-900">Confirm Disposal</h2>
+                            <button onClick={() => setConfirmModalOpen(false)} className="text-slate-500 hover:text-slate-700 cursor-pointer">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <p className="mb-4 text-sm text-slate-600">
+                            Are you sure you want to dispose the following <span className="font-bold text-slate-900">{targetDisposeIds.size}</span> asset(s)? This action will move them to the Disposed list.
+                        </p>
+
+                        <div className="mb-6 flex-1 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3 max-h-[300px]">
+                            <ul className="space-y-2">
+                                {assets.filter(a => targetDisposeIds.has(a.id)).map(asset => (
+                                    <li key={asset.id} className="flex flex-col border-b border-slate-200 pb-2 last:border-0 last:pb-0">
+                                        <span className="font-semibold text-slate-900">{asset.computerNo}</span>
+                                        <span className="text-xs text-slate-500">Serial: {asset.serialNo}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setConfirmModalOpen(false)}
+                                className="rounded-md border border-slate-300 px-4 py-2 text-slate-700 hover:bg-slate-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDispose}
+                                className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700 transition-colors shadow-sm"
+                            >
+                                Dispose
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Success Modal */}
+            {recentlyDisposedAssets && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl max-h-[90vh] flex flex-col">
+                        <div className="mb-4 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 className="h-6 w-6 text-green-600" />
+                                <h2 className="text-xl font-bold text-slate-900">Disposal Complete</h2>
+                            </div>
+                            <button onClick={() => setRecentlyDisposedAssets(null)} className="text-slate-500 hover:text-slate-700 cursor-pointer">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <p className="mb-4 text-sm text-slate-600">
+                            Successfully disposed <span className="font-bold text-slate-900">{recentlyDisposedAssets.length}</span> asset(s).
+                        </p>
+
+                        <div className="mb-6 flex-1 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3 max-h-[300px]">
+                            <ul className="space-y-2">
+                                {recentlyDisposedAssets.map(asset => (
+                                    <li key={asset.id} className="flex flex-col border-b border-slate-200 pb-2 last:border-0 last:pb-0">
+                                        <span className="font-semibold text-slate-900">{asset.computerNo}</span>
+                                        <span className="text-xs text-slate-500">Serial: {asset.serialNo}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <button
+                                onClick={() => setRecentlyDisposedAssets(null)}
+                                className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition-colors shadow-sm"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

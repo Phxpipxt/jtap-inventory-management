@@ -31,7 +31,7 @@ export const DEPARTMENTS: Department[] = [
     "TC",
 ];
 
-export type AssetStatus = "In Stock" | "In Use" | "Resign" | "Assigned" | "Broken" | "Maintenance";
+export type AssetStatus = "In Stock" | "In Use" | "Resign" | "Assigned" | "Broken" | "Maintenance" | "Disposed";
 
 export type Brand = "Dell" | "Lenovo" | "HP" | "Asus";
 export const BRANDS: Brand[] = ["Dell", "Lenovo", "HP", "Asus"];
@@ -89,8 +89,6 @@ export interface AuditLog {
     verifiedAt?: string; // Deprecated
     supervisor1VerifiedBy?: string;
     supervisor1VerifiedAt?: string;
-    supervisor2VerifiedBy?: string;
-    supervisor2VerifiedAt?: string;
     verificationStatus?: "Pending" | "Supervisor 1 Verified" | "Verified"; // "Verified" means Fully Verified
 }
 

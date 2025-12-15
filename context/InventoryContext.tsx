@@ -1,335 +1,430 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import React, { createContext, useContext } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Asset, LogEntry, AuditLog } from "@/lib/types";
-import { saveImagesToDB, getImagesFromDB, deleteImageFromDB } from "@/lib/db";
-
-const ASSETS_KEY = "inventory_assets";
-const LOGS_KEY = "inventory_logs";
+import {
+    getAssets, getLogs, getAuditLogs,
+    createAsset as createAssetAction,
+    updateAsset as updateAssetAction,
+    deleteAsset as deleteAssetAction,
+    deleteAssets as deleteAssetsAction,
+    createLog,
+    createLogs,
+    saveAuditLog as saveAuditLogAction
+} from "@/lib/actions";
 
 interface InventoryContextType {
     assets: Asset[];
     logs: LogEntry[];
+    auditLogs: AuditLog[];
     loading: boolean;
     addAsset: (asset: Asset, adminUser: string) => Promise<void>;
     addAssets: (newAssetsList: Asset[], adminUser: string) => Promise<void>;
     updateAsset: (updatedAsset: Asset, adminUser: string, action: "Check-in" | "Check-out" | "Update", details?: string) => Promise<void>;
     deleteAsset: (assetId: string, adminUser: string) => Promise<void>;
     deleteAssets: (assetIds: string[], adminUser: string) => Promise<void>;
-    auditLogs: import("@/lib/types").AuditLog[];
-    saveAuditLog: (log: import("@/lib/types").AuditLog) => void;
-    verifyAuditLog: (logId: string, verifier: string, step: 1 | 2) => void;
+    saveAuditLog: (log: AuditLog) => Promise<void>;
+    verifyAuditLog: (logId: string, verifier: string, step: 1 | 2) => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
 export function InventoryProvider({ children }: { children: React.ReactNode }) {
-    const [assets, setAssets] = useState<Asset[]>([]);
-    const [logs, setLogs] = useState<LogEntry[]>([]);
-    const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
 
-    // Refs to hold current state for event handlers to avoid stale closures
-    const assetsRef = useRef(assets);
-    const logsRef = useRef(logs);
-    const auditLogsRef = useRef(auditLogs);
+    // Queries
+    const { data: assets = [], isLoading: assetsLoading } = useQuery({
+        queryKey: ["assets"],
+        queryFn: getAssets,
+        staleTime: 1000 * 60 * 5, // 5 minutes
+    });
 
-    useEffect(() => {
-        assetsRef.current = assets;
-    }, [assets]);
+    const { data: logs = [], isLoading: logsLoading } = useQuery({
+        queryKey: ["logs"],
+        queryFn: getLogs,
+        staleTime: 1000 * 60 * 5, // 5 minutes
+    });
 
-    useEffect(() => {
-        logsRef.current = logs;
-    }, [logs]);
+    const { data: auditLogs = [], isLoading: auditLogsLoading } = useQuery({
+        queryKey: ["auditLogs"],
+        queryFn: getAuditLogs,
+        staleTime: 1000 * 60 * 5, // 5 minutes
+    });
 
-    useEffect(() => {
-        auditLogsRef.current = auditLogs;
-    }, [auditLogs]);
+    // Optimization: Only block UI on critical 'assets' data. 
+    // Logs and Audits can load in background to speed up initial paint.
+    const loading = assetsLoading;
 
-    useEffect(() => {
-        const loadData = async () => {
-            const storedAssets = localStorage.getItem(ASSETS_KEY);
-            const storedLogs = localStorage.getItem(LOGS_KEY);
-            const storedAuditLogs = localStorage.getItem("inventory_audit_logs");
+    // Mutations with Optimistic Updates
 
-            if (storedAssets) {
-                let parsedAssets: Asset[] = JSON.parse(storedAssets);
+    const addAssetMutation = useMutation({
+        mutationFn: async ({ asset, adminUser }: { asset: Asset; adminUser: string }) => {
+            const log: LogEntry = {
+                id: crypto.randomUUID(),
+                assetId: asset.id,
+                computerNo: asset.computerNo,
+                serialNo: asset.serialNo,
+                action: "Add",
+                timestamp: new Date().toISOString(),
+                adminUser,
+                details: "Initial stock in",
+            };
+            await createAssetAction(asset, adminUser);
+            await createLog(log);
+            return { asset, log };
+        },
+        onMutate: async ({ asset, adminUser }) => {
+            await queryClient.cancelQueries({ queryKey: ["assets"] });
+            await queryClient.cancelQueries({ queryKey: ["logs"] });
 
-                // Data Migration: Rename OMD -> OD, PUR -> PU
-                let hasChanges = false;
-                parsedAssets = parsedAssets.map(asset => {
-                    // Migrate Department
-                    if (asset.department === "OMD" as any) {
-                        hasChanges = true;
-                        asset.department = "OD";
-                    }
-                    if (asset.department === "PUR" as any) {
-                        hasChanges = true;
-                        asset.department = "PU";
-                    }
+            const previousAssets = queryClient.getQueryData<Asset[]>(["assets"]);
+            const previousLogs = queryClient.getQueryData<LogEntry[]>(["logs"]);
 
-                    // Migrate Status
-                    if (asset.status === "Assigned" as any) {
-                        hasChanges = true;
-                        asset.status = "In Use";
-                    }
-                    if (asset.status === "Broken" as any || asset.status === "Maintenance" as any) {
-                        hasChanges = true;
-                        asset.status = "Resign";
-                    }
+            const log: LogEntry = {
+                id: crypto.randomUUID(),
+                assetId: asset.id,
+                computerNo: asset.computerNo,
+                serialNo: asset.serialNo,
+                action: "Add",
+                timestamp: new Date().toISOString(),
+                adminUser,
+                details: "Initial stock in (Optimistic)",
+            };
 
-                    return asset;
-                });
+            queryClient.setQueryData<Asset[]>(["assets"], (old = []) => [asset, ...old]);
+            queryClient.setQueryData<LogEntry[]>(["logs"], (old = []) => [log, ...old]);
 
-                // Load images from IndexedDB and merge
-                const assetsWithImages = await Promise.all(parsedAssets.map(async (asset) => {
-                    try {
-                        // Load images array (backward compatible with single image)
-                        const images = await getImagesFromDB(asset.id);
-                        if (images && images.length > 0) {
-                            return { ...asset, images };
-                        }
-                    } catch (e) {
-                        console.error(`Failed to load images for asset ${asset.id}`, e);
-                    }
-                    return asset;
-                }));
+            return { previousAssets, previousLogs };
+        },
+        onError: (_err, _newAsset, context) => {
+            queryClient.setQueryData(["assets"], context?.previousAssets);
+            queryClient.setQueryData(["logs"], context?.previousLogs);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["assets"] });
+            queryClient.invalidateQueries({ queryKey: ["logs"] });
+        },
+    });
 
-                setAssets(assetsWithImages);
+    const updateAssetMutation = useMutation({
+        mutationFn: async ({ updatedAsset, adminUser, action, details }: { updatedAsset: Asset; adminUser: string; action: "Check-in" | "Check-out" | "Update"; details?: string }) => {
+            // Fetch current asset for distribution date logic if needed, but for mutation we just trust passed data + action
+            // However, for the 'Check-in' log detail logic (Distributed: date), we need the old asset. 
+            // We can pass it or fetch it, but let's assume client handles detail formatting or we keep it simple.
+            // Re-implementing logic from original:
+            const oldAsset = assets.find(a => a.id === updatedAsset.id);
+            const logDetail = action === "Check-in" && oldAsset?.distributionDate
+                ? `${details} (Distributed: ${new Date(oldAsset.distributionDate).toLocaleDateString()})`
+                : details;
 
-                // We don't save back immediately here unless migration happened, 
-                // but if we do, we must ensure we use the stripped version.
-                if (hasChanges) {
-                    saveAssetsToStorage(parsedAssets); // parsedAssets doesn't have images yet, which is what we want for localStorage
+            const log: LogEntry = {
+                id: crypto.randomUUID(),
+                assetId: updatedAsset.id,
+                computerNo: updatedAsset.computerNo,
+                serialNo: updatedAsset.serialNo,
+                action,
+                timestamp: new Date().toISOString(),
+                adminUser,
+                details: logDetail,
+            };
+
+            await updateAssetAction(updatedAsset, adminUser);
+            await createLog(log);
+            return { updatedAsset, log };
+        },
+        onMutate: async ({ updatedAsset, adminUser, action, details }) => {
+            await queryClient.cancelQueries({ queryKey: ["assets"] });
+            await queryClient.cancelQueries({ queryKey: ["logs"] });
+
+            const previousAssets = queryClient.getQueryData<Asset[]>(["assets"]);
+            const previousLogs = queryClient.getQueryData<LogEntry[]>(["logs"]);
+
+            const oldAsset = previousAssets?.find(a => a.id === updatedAsset.id);
+            const logDetail = action === "Check-in" && oldAsset?.distributionDate
+                ? `${details} (Distributed: ${new Date(oldAsset.distributionDate).toLocaleDateString()})`
+                : details;
+
+            const log: LogEntry = {
+                id: crypto.randomUUID(),
+                assetId: updatedAsset.id,
+                computerNo: updatedAsset.computerNo,
+                serialNo: updatedAsset.serialNo,
+                action,
+                timestamp: new Date().toISOString(),
+                adminUser,
+                details: logDetail + " (Optimistic)",
+            };
+
+            queryClient.setQueryData<Asset[]>(["assets"], (old = []) =>
+                old.map((a) => (a.id === updatedAsset.id ? updatedAsset : a))
+            );
+            queryClient.setQueryData<LogEntry[]>(["logs"], (old = []) => [log, ...old]);
+
+            return { previousAssets, previousLogs };
+        },
+        onError: (_err, _vars, context) => {
+            queryClient.setQueryData(["assets"], context?.previousAssets);
+            queryClient.setQueryData(["logs"], context?.previousLogs);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["assets"] });
+            queryClient.invalidateQueries({ queryKey: ["logs"] });
+        },
+    });
+
+    const deleteAssetMutation = useMutation({
+        mutationFn: async ({ assetId, adminUser }: { assetId: string; adminUser: string }) => {
+            const assetToDelete = assets.find(a => a.id === assetId);
+            if (!assetToDelete) return; // Should not happen
+
+            const log: LogEntry = {
+                id: crypto.randomUUID(),
+                assetId: assetId,
+                computerNo: assetToDelete.computerNo,
+                serialNo: assetToDelete.serialNo,
+                action: "Delete",
+                timestamp: new Date().toISOString(),
+                adminUser,
+                details: "Asset deleted from inventory",
+            };
+
+            await deleteAssetAction(assetId);
+            await createLog(log);
+        },
+        onMutate: async ({ assetId, adminUser }) => {
+            await queryClient.cancelQueries({ queryKey: ["assets"] });
+            await queryClient.cancelQueries({ queryKey: ["logs"] });
+
+            const previousAssets = queryClient.getQueryData<Asset[]>(["assets"]) || [];
+            const previousLogs = queryClient.getQueryData<LogEntry[]>(["logs"]) || [];
+
+            const assetToDelete = previousAssets.find(a => a.id === assetId);
+            if (!assetToDelete) return { previousAssets, previousLogs };
+
+            const log: LogEntry = {
+                id: crypto.randomUUID(),
+                assetId: assetId,
+                computerNo: assetToDelete.computerNo,
+                serialNo: assetToDelete.serialNo,
+                action: "Delete",
+                timestamp: new Date().toISOString(),
+                adminUser,
+                details: "Asset deleted from inventory (Optimistic)",
+            };
+
+            queryClient.setQueryData<Asset[]>(["assets"], (old = []) => old.filter(a => a.id !== assetId));
+            queryClient.setQueryData<LogEntry[]>(["logs"], (old = []) => [log, ...old]);
+
+            return { previousAssets, previousLogs };
+        },
+        onError: (_err, _vars, context) => {
+            if (context) {
+                queryClient.setQueryData(["assets"], context.previousAssets);
+                queryClient.setQueryData(["logs"], context.previousLogs);
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["assets"] });
+            queryClient.invalidateQueries({ queryKey: ["logs"] });
+        },
+    });
+
+    const deleteAssetsBatchMutation = useMutation({
+        mutationFn: async ({ assetIds, adminUser }: { assetIds: string[]; adminUser: string }) => {
+            const assetsToDelete = assets.filter(a => assetIds.includes(a.id));
+            const newLogs: LogEntry[] = assetsToDelete.map(asset => ({
+                id: crypto.randomUUID(),
+                assetId: asset.id,
+                computerNo: asset.computerNo,
+                serialNo: asset.serialNo,
+                action: "Delete",
+                timestamp: new Date().toISOString(),
+                adminUser,
+                details: "Batch delete",
+            }));
+
+            await deleteAssetsAction(assetIds);
+            await createLogs(newLogs);
+        },
+        onMutate: async ({ assetIds, adminUser }) => {
+            await queryClient.cancelQueries({ queryKey: ["assets"] });
+            await queryClient.cancelQueries({ queryKey: ["logs"] });
+
+            const previousAssets = queryClient.getQueryData<Asset[]>(["assets"]) || [];
+            const previousLogs = queryClient.getQueryData<LogEntry[]>(["logs"]) || [];
+
+            const assetsToDelete = previousAssets.filter(a => assetIds.includes(a.id));
+
+            const newLogs: LogEntry[] = assetsToDelete.map(asset => ({
+                id: crypto.randomUUID(),
+                assetId: asset.id,
+                computerNo: asset.computerNo,
+                serialNo: asset.serialNo,
+                action: "Delete",
+                timestamp: new Date().toISOString(),
+                adminUser,
+                details: "Batch delete (Optimistic)",
+            }));
+
+            queryClient.setQueryData<Asset[]>(["assets"], (old = []) => old.filter(a => !assetIds.includes(a.id)));
+            queryClient.setQueryData<LogEntry[]>(["logs"], (old = []) => [...newLogs, ...old]);
+
+            return { previousAssets, previousLogs };
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["assets"] });
+            queryClient.invalidateQueries({ queryKey: ["logs"] });
+        },
+    });
+
+    const addAssetsBatchMutation = useMutation({
+        mutationFn: async ({ newAssetsList, adminUser }: { newAssetsList: Asset[]; adminUser: string }) => {
+            // Simplified logic: server handles update/create? 
+            // The original logic did client-side diffing. Replicating that here is tricky in mutationFn...
+            // But we can do it.
+            let updatedAssets = [...assets];
+            const logsToAdd: LogEntry[] = [];
+            const assetsToCreate: Asset[] = [];
+            const assetsToUpdate: Asset[] = [];
+
+            for (const newAsset of newAssetsList) {
+                const existingIndex = updatedAssets.findIndex(
+                    a => a.computerNo === newAsset.computerNo || a.serialNo === newAsset.serialNo
+                );
+
+                if (existingIndex >= 0) {
+                    const existingAsset = updatedAssets[existingIndex];
+                    const updatedAsset = { ...newAsset, id: existingAsset.id };
+                    updatedAssets[existingIndex] = updatedAsset;
+                    assetsToUpdate.push(updatedAsset);
+
+                    logsToAdd.push({
+                        id: crypto.randomUUID(),
+                        assetId: existingAsset.id,
+                        computerNo: newAsset.computerNo,
+                        serialNo: newAsset.serialNo,
+                        action: "Update",
+                        timestamp: new Date().toISOString(),
+                        adminUser,
+                        details: "Batch import overwrite",
+                    });
+                } else {
+                    updatedAssets.push(newAsset);
+                    assetsToCreate.push(newAsset);
+
+                    logsToAdd.push({
+                        id: crypto.randomUUID(),
+                        assetId: newAsset.id,
+                        computerNo: newAsset.computerNo,
+                        serialNo: newAsset.serialNo,
+                        action: "Add",
+                        timestamp: new Date().toISOString(),
+                        adminUser,
+                        details: "Batch import",
+                    });
                 }
             }
-            if (storedLogs) setLogs(JSON.parse(storedLogs));
-            if (storedAuditLogs) setAuditLogs(JSON.parse(storedAuditLogs));
 
-            setLoading(false);
-        };
+            // Execute actions
+            for (const a of assetsToCreate) await createAssetAction(a, adminUser);
+            for (const a of assetsToUpdate) await updateAssetAction(a, adminUser);
+            if (logsToAdd.length > 0) await createLogs(logsToAdd);
+        },
+        onMutate: async ({ newAssetsList, adminUser }) => {
+            await queryClient.cancelQueries({ queryKey: ["assets"] });
+            await queryClient.cancelQueries({ queryKey: ["logs"] });
 
-        loadData();
-    }, []);
+            // Optimistic logic (same as mutationFn but updates cache)
+            const previousAssets = queryClient.getQueryData<Asset[]>(["assets"]) || [];
+            const previousLogs = queryClient.getQueryData<LogEntry[]>(["logs"]) || [];
 
-    // Helper to save assets to local storage WITHOUT images
-    const saveAssetsToStorage = (assetsToSave: Asset[]) => {
-        // Strip both 'image' and 'images' before saving to localStorage
-        const assetsWithoutImages = assetsToSave.map(({ image, images, ...rest }) => rest);
-        try {
-            localStorage.setItem(ASSETS_KEY, JSON.stringify(assetsWithoutImages));
-        } catch (error) {
-            console.error("Failed to save assets to localStorage", error);
-            alert("Failed to save data. Storage quota exceeded.");
+            // ... logic to calc optimistic state ...
+            // Be lazy here: Refetching is safer for batch. 
+            // But for consistency let's try basic optimistic or just refetch.
+            // Given complexity, let's just Optimistically add everything and assume success?
+            // Or actually, simple invalidation is safer for batch imports.
+            // Let's rely on invalidation for Batch Import to avoid code duplication bugs.
+
+            return { previousAssets, previousLogs };
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["assets"] });
+            queryClient.invalidateQueries({ queryKey: ["logs"] });
         }
-    };
+    });
 
-    const saveLogs = (newLogs: LogEntry[]) => {
-        setLogs(newLogs);
-        try {
-            localStorage.setItem(LOGS_KEY, JSON.stringify(newLogs));
-        } catch (e) {
-            console.error("Failed to save logs", e);
-            // If logs fail, we might want to truncate old logs.
+    const saveAuditLogMutation = useMutation({
+        mutationFn: async (log: AuditLog) => {
+            await saveAuditLogAction(log);
+        },
+        onMutate: async (log) => {
+            await queryClient.cancelQueries({ queryKey: ["auditLogs"] });
+            const previousAudits = queryClient.getQueryData<AuditLog[]>(["auditLogs"]);
+
+            queryClient.setQueryData<AuditLog[]>(["auditLogs"], (old = []) => {
+                const filtered = old.filter(l => l.id !== log.id);
+                return [log, ...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            });
+
+            return { previousAudits };
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["auditLogs"] });
         }
-    };
+    });
 
-    const saveAuditLog = (log: AuditLog) => {
-        const newAuditLogs = [log, ...auditLogsRef.current];
-        setAuditLogs(newAuditLogs);
-        localStorage.setItem("inventory_audit_logs", JSON.stringify(newAuditLogs));
-    };
-
+    // Wrapper functions
     const addAsset = async (asset: Asset, adminUser: string) => {
-        // 1. Save images to DB if exists
-        if (asset.images && asset.images.length > 0) {
-            await saveImagesToDB(asset.id, asset.images);
-        }
-
-        // 2. Update state (keep images in memory)
-        const newAssets = [...assetsRef.current, asset];
-        setAssets(newAssets);
-
-        // 3. Save to localStorage (strip images)
-        saveAssetsToStorage(newAssets);
-
-        const log: LogEntry = {
-            id: crypto.randomUUID(),
-            assetId: asset.id,
-            computerNo: asset.computerNo,
-            serialNo: asset.serialNo,
-            action: "Add",
-            timestamp: new Date().toISOString(),
-            adminUser,
-            details: "Initial stock in",
-        };
-        saveLogs([log, ...logsRef.current]);
+        await addAssetMutation.mutateAsync({ asset, adminUser });
     };
 
     const addAssets = async (newAssetsList: Asset[], adminUser: string) => {
-        let updatedAssets = [...assetsRef.current];
-        const logsToAdd: LogEntry[] = [];
-
-        for (const newAsset of newAssetsList) {
-            // Use partial match (||) to find existing asset to update.
-            // This ensures that if we have a match on EITHER Computer No OR Serial No,
-            // we update that asset instead of creating a duplicate.
-            // This is crucial for "Replace" functionality in Import.
-            const existingIndex = updatedAssets.findIndex(
-                a => a.computerNo === newAsset.computerNo || a.serialNo === newAsset.serialNo
-            );
-
-            if (existingIndex >= 0) {
-                // Update existing asset
-                const existingAsset = updatedAssets[existingIndex];
-
-                // Handle image update
-                if (newAsset.images && newAsset.images.length > 0) {
-                    await saveImagesToDB(existingAsset.id, newAsset.images);
-                }
-
-                updatedAssets[existingIndex] = { ...newAsset, id: existingAsset.id }; // Keep original ID
-
-                logsToAdd.push({
-                    id: crypto.randomUUID(),
-                    assetId: existingAsset.id,
-                    computerNo: newAsset.computerNo,
-                    serialNo: newAsset.serialNo,
-                    action: "Update",
-                    timestamp: new Date().toISOString(),
-                    adminUser,
-                    details: "Batch import overwrite",
-                });
-            } else {
-                // Add new asset
-                if (newAsset.images && newAsset.images.length > 0) {
-                    await saveImagesToDB(newAsset.id, newAsset.images);
-                }
-
-                updatedAssets.push(newAsset);
-                logsToAdd.push({
-                    id: crypto.randomUUID(),
-                    assetId: newAsset.id,
-                    computerNo: newAsset.computerNo,
-                    serialNo: newAsset.serialNo,
-                    action: "Add",
-                    timestamp: new Date().toISOString(),
-                    adminUser,
-                    details: "Batch import",
-                });
-            }
-        }
-
-        setAssets(updatedAssets);
-        saveAssetsToStorage(updatedAssets);
-        saveLogs([...logsToAdd, ...logsRef.current]);
+        await addAssetsBatchMutation.mutateAsync({ newAssetsList, adminUser });
     };
 
     const updateAsset = async (updatedAsset: Asset, adminUser: string, action: "Check-in" | "Check-out" | "Update", details?: string) => {
-        const oldAsset = assetsRef.current.find(a => a.id === updatedAsset.id);
-
-        // Handle images update
-        if (updatedAsset.images && updatedAsset.images.length > 0) {
-            await saveImagesToDB(updatedAsset.id, updatedAsset.images);
-        } else {
-            // If images is explicitly empty or undefined, check if we need to delete
-            if (oldAsset?.images && (!updatedAsset.images || updatedAsset.images.length === 0)) {
-                await deleteImageFromDB(updatedAsset.id);
-            }
-        }
-
-        const newAssets = assetsRef.current.map((a) => (a.id === updatedAsset.id ? updatedAsset : a));
-        setAssets(newAssets);
-        saveAssetsToStorage(newAssets);
-
-        const log: LogEntry = {
-            id: crypto.randomUUID(),
-            assetId: updatedAsset.id,
-            computerNo: updatedAsset.computerNo,
-            serialNo: updatedAsset.serialNo,
-            action,
-            timestamp: new Date().toISOString(),
-            adminUser,
-            details: action === "Check-in" && oldAsset?.distributionDate
-                ? `${details} (Distributed: ${new Date(oldAsset.distributionDate).toLocaleDateString()})`
-                : details,
-        };
-        saveLogs([log, ...logsRef.current]);
+        await updateAssetMutation.mutateAsync({ updatedAsset, adminUser, action, details });
     };
 
     const deleteAsset = async (assetId: string, adminUser: string) => {
-        const assetToDelete = assetsRef.current.find(a => a.id === assetId);
-        if (!assetToDelete) return;
-
-        await deleteImageFromDB(assetId);
-
-        const newAssets = assetsRef.current.filter((a) => a.id !== assetId);
-        setAssets(newAssets);
-        saveAssetsToStorage(newAssets);
-
-        const log: LogEntry = {
-            id: crypto.randomUUID(),
-            assetId: assetId,
-            computerNo: assetToDelete.computerNo,
-            serialNo: assetToDelete.serialNo,
-            action: "Delete",
-            timestamp: new Date().toISOString(),
-            adminUser,
-            details: "Asset deleted from inventory",
-        };
-        saveLogs([log, ...logsRef.current]);
-    };
-
-    const verifyAuditLog = (logId: string, verifier: string, step: 1 | 2) => {
-        const updatedLogs = auditLogsRef.current.map(log => {
-            if (log.id === logId) {
-                if (step === 1) {
-                    return {
-                        ...log,
-                        supervisor1VerifiedBy: verifier,
-                        supervisor1VerifiedAt: new Date().toISOString(),
-                        verificationStatus: "Supervisor 1 Verified" as const
-                    };
-                } else if (step === 2) {
-                    return {
-                        ...log,
-                        supervisor2VerifiedBy: verifier,
-                        supervisor2VerifiedAt: new Date().toISOString(),
-                        verificationStatus: "Verified" as const,
-                        // Update legacy fields for backward compatibility
-                        verifiedBy: verifier,
-                        verifiedAt: new Date().toISOString(),
-                    };
-                }
-            }
-            return log;
-        });
-        setAuditLogs(updatedLogs);
-        localStorage.setItem("inventory_audit_logs", JSON.stringify(updatedLogs));
+        await deleteAssetMutation.mutateAsync({ assetId, adminUser });
     };
 
     const deleteAssets = async (assetIds: string[], adminUser: string) => {
-        const assetsToDelete = assetsRef.current.filter(a => assetIds.includes(a.id));
-        if (assetsToDelete.length === 0) return;
+        await deleteAssetsBatchMutation.mutateAsync({ assetIds, adminUser });
+    };
 
-        // Delete images
-        await Promise.all(assetIds.map(id => deleteImageFromDB(id)));
+    const saveAuditLog = async (log: AuditLog) => {
+        await saveAuditLogMutation.mutateAsync(log);
+    };
 
-        const newAssets = assetsRef.current.filter((a) => !assetIds.includes(a.id));
-        setAssets(newAssets);
-        saveAssetsToStorage(newAssets);
+    const verifyAuditLog = async (logId: string, verifier: string, step: 1 | 2) => {
+        // Logic is simple update to auditLog object, reuse saveAuditLogMutation logic?
+        // Or create specific mutation? Can reuse saveAuditLog wrapper but we need to construct the object.
+        // We need latest audit logs to find the object.
+        const logToUpdate = auditLogs.find(l => l.id === logId);
+        if (!logToUpdate) return;
 
-        const newLogs: LogEntry[] = assetsToDelete.map(asset => ({
-            id: crypto.randomUUID(),
-            assetId: asset.id,
-            computerNo: asset.computerNo,
-            serialNo: asset.serialNo,
-            action: "Delete",
-            timestamp: new Date().toISOString(),
-            adminUser,
-            details: "Batch delete",
-        }));
-        saveLogs([...newLogs, ...logsRef.current]);
+        let updatedLog: AuditLog;
+        if (step === 1) {
+            updatedLog = {
+                ...logToUpdate,
+                supervisor1VerifiedBy: verifier,
+                supervisor1VerifiedAt: new Date().toISOString(),
+                verificationStatus: "Supervisor 1 Verified"
+            };
+        } else {
+            updatedLog = {
+                ...logToUpdate,
+                verificationStatus: "Verified",
+                verifiedBy: verifier,
+                verifiedAt: new Date().toISOString(),
+            };
+            // Note: Typescript might complain about modifying read-only from query cache if strict.
+            // But verifyAuditLog in context is supposed to be simple.
+        }
+        await saveAuditLogMutation.mutateAsync(updatedLog);
     };
 
     const value = React.useMemo(() => ({
@@ -344,7 +439,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         deleteAssets,
         saveAuditLog,
         verifyAuditLog
-    }), [assets, logs, auditLogs, loading]);
+    }), [assets, logs, auditLogs, loading, addAssetMutation, addAssetsBatchMutation, updateAssetMutation, deleteAssetMutation, saveAuditLogMutation]);
 
     return (
         <InventoryContext.Provider value={value}>

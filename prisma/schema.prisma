@@ -1,0 +1,73 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Asset {
+  id               String    @id
+  computerNo       String
+  serialNo         String
+  brand            String?
+  model            String?
+  owner            String?
+  empId            String?
+  department       String?
+  status           String
+  purchaseDate     DateTime?
+  warrantyExpiry   DateTime?
+  tags             String[]
+  remarks          String?
+  hdd              String?
+  ram              String?
+  cpu              String?
+  distributionDate DateTime?
+  lastUpdated      DateTime
+  updatedBy        String
+
+  images Image[]
+  logs   LogEntry[]
+}
+
+model Image {
+  id      String @id @default(uuid())
+  data    String
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+}
+
+model LogEntry {
+  id         String   @id
+  assetId    String
+  // Relation to Asset
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  computerNo String
+  serialNo   String
+  action     String
+  timestamp  DateTime
+  adminUser  String
+  details    String?
+}
+
+model AuditLog {
+  id                    String    @id
+  date                  DateTime
+  totalAssets           Int
+  scannedCount          Int
+  missingCount          Int
+  scannedIds            String[]
+  missingIds            String[]
+  status                String
+  auditedBy             String?
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  supervisor1VerifiedBy String?
+  supervisor1VerifiedAt DateTime?
+
+  verificationStatus    String?
+}

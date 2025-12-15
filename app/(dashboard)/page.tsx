@@ -82,11 +82,11 @@ export default function DashboardPage() {
             <div className="grid gap-6 md:grid-cols-4">
                 <div className="rounded-lg bg-white p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                     <div className="flex items-center gap-4">
-                        <div className="rounded-full bg-indigo-50 p-3">
-                            <Package className="h-6 w-6 text-indigo-600" />
+                        <div className="rounded-full bg-slate-100 p-3">
+                            <Package className="h-6 w-6 text-slate-600" />
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-indigo-600">Total Assets</p>
+                            <p className="text-sm font-medium text-slate-600">Total Assets</p>
                             <p className="text-2xl font-bold text-slate-900">{totalAssets}</p>
                         </div>
                     </div>

@@ -18,6 +18,7 @@ import { AssetDetailModal } from "@/components/modals/AssetDetailModal";
 import { AssetHistoryModal } from "@/components/modals/AssetHistoryModal";
 import { useAuth } from "@/context/AuthContext";
 import { Eye } from "lucide-react";
+import { DashboardSkeleton } from "@/components/skeletons/AppSkeletons";
 
 function InventoryContent() {
     const { assets, logs, loading, addAsset, updateAsset, deleteAsset, deleteAssets } = useInventory();
@@ -28,7 +29,7 @@ function InventoryContent() {
     const [searchTerm, setSearchTerm] = useState("");
     const [departmentFilter, setDepartmentFilter] = useState<Department | "All">("All");
     const [statusFilter, setStatusFilter] = useState<AssetStatus | "All">("All");
-    const [lifecycleFilter, setLifecycleFilter] = useState<"> 5 Years" | "< 5 Years" | "All">("All");
+    const [lifecycleFilter, setLifecycleFilter] = useState<"More than 5 Years" | "Less than 5 Years" | "All">("All");
 
     // Initialize status filter from URL if present
     useEffect(() => {
@@ -38,7 +39,7 @@ function InventoryContent() {
     }, [initialStatus]);
 
     // Sorting State
-    const [sortConfig, setSortConfig] = useState<{ key: keyof Asset | "dept" | "warranty" | null; direction: "asc" | "desc" }>({ key: null, direction: "asc" });
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Asset | "dept" | "warranty" | null; direction: "asc" | "desc" }>({ key: "computerNo", direction: "asc" });
 
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -89,7 +90,7 @@ function InventoryContent() {
             let matchesLifecycle = true;
             if (lifecycleFilter !== "All") {
                 const age = calculateAssetAge(asset.purchaseDate).years;
-                if (lifecycleFilter === "> 5 Years") {
+                if (lifecycleFilter === "More than 5 Years") {
                     matchesLifecycle = age >= 5;
                 } else {
                     matchesLifecycle = age < 5;
@@ -277,7 +278,7 @@ function InventoryContent() {
     const handleSaveAssignment = (updatedAsset: Asset) => {
         let details = "";
         if (updatedAsset.status === "In Use") {
-            details = `Assigned to ${updatedAsset.owner} (${updatedAsset.department})`;
+            details = `Assigned to ${updatedAsset.owner} (ID: ${updatedAsset.empId || "N/A"}, Dept: ${updatedAsset.department})`;
         } else {
             // If returning, we want to know who it was returned FROM.
             // The `updatedAsset` (from modal) has owner cleared.
@@ -319,7 +320,11 @@ function InventoryContent() {
         setIsDeleteModalOpen(true);
     };
 
-    if (loading) return <div className="p-8">Loading...</div>;
+
+
+    // ... (inside the component)
+
+    if (loading) return <DashboardSkeleton />;
 
     return (
         <div className="space-y-6 pb-20 md:pb-0">
@@ -329,70 +334,108 @@ function InventoryContent() {
 
             {/* Dashboard Summary */}
             {/* Dashboard Summary */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <div className="flex flex-col justify-between rounded-2xl bg-white p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all hover:-translate-y-1">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <p className="text-sm font-bold text-indigo-600">Total Assets</p>
-                            <h3 className="mt-2 text-4xl font-extrabold text-slate-900">{assets.length}</h3>
+            {/* Dashboard Summary */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-6">
+                {/* Total Assets - Large Card (Left) */}
+                <div className="group relative flex flex-col justify-between overflow-hidden rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 transition-all hover:shadow-xl lg:col-span-2">
+                    {/* Decorative Background Accents - Subtle for Light Theme */}
+                    <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-slate-50 blur-3xl group-hover:bg-slate-100 transition-colors"></div>
+                    <div className="absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-blue-50/50 blur-2xl group-hover:bg-blue-100/50 transition-colors"></div>
+
+                    <div className="relative z-10 flex h-full flex-col justify-between">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Total Assets</p>
+                                <h3 className="mt-2 text-6xl font-black tracking-tight text-slate-900">{assets.filter(a => a.status !== "Disposed").length}</h3>
+                            </div>
+                            <div className="rounded-2xl bg-slate-50 p-4 transition-colors group-hover:bg-slate-100">
+                                <Box className="h-10 w-10 text-slate-700" />
+                            </div>
                         </div>
-                        <div className="rounded-xl bg-indigo-50 p-3">
-                            <Box className="h-6 w-6 text-indigo-600" />
+                        <div className="mt-8 flex items-center gap-3">
+                            <div className="flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white shadow-md shadow-slate-200">
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                                ALL
+                            </div>
+                            <span className="text-sm font-medium text-slate-500">Registered Items</span>
                         </div>
-                    </div>
-                    <div className="mt-4 flex items-center gap-1 text-xs font-medium text-slate-400">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-slate-400"></span>
-                        All registered items
                     </div>
                 </div>
 
-                <div className="flex flex-col justify-between rounded-2xl bg-white p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all hover:-translate-y-1">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <p className="text-sm font-bold text-emerald-600">In Stock</p>
-                            <h3 className="mt-2 text-4xl font-extrabold text-slate-900">{assets.filter(a => a.status === "In Stock").length}</h3>
+                {/* Status Grid (Right) */}
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:col-span-3 lg:grid-rows-2 lg:gap-4">
+                    {/* In Stock */}
+                    <div className="group relative flex flex-col justify-between rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition-all hover:-translate-y-1 hover:shadow-lg hover:ring-emerald-100">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-sm font-bold uppercase tracking-wide text-gray-500">In Stock</p>
+                                <h3 className="mt-2 text-4xl font-extrabold text-slate-900">{assets.filter(a => a.status === "In Stock").length}</h3>
+                            </div>
+                            <div className="rounded-2xl bg-emerald-50 p-3 transition-colors group-hover:bg-emerald-100">
+                                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                            </div>
                         </div>
-                        <div className="rounded-xl bg-emerald-50 p-3">
-                            <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                        <div className="mt-4 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                Available
+                            </span>
                         </div>
                     </div>
-                    <div className="mt-4 flex items-center gap-1 text-xs font-medium text-emerald-600">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                        Available for use
-                    </div>
-                </div>
 
-                <div className="flex flex-col justify-between rounded-2xl bg-white p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all hover:-translate-y-1">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <p className="text-sm font-bold text-blue-600">In Use</p>
-                            <h3 className="mt-2 text-4xl font-extrabold text-slate-900">{assets.filter(a => a.status === "In Use").length}</h3>
+                    {/* Second-hand */}
+                    <div className="group relative flex flex-col justify-between rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition-all hover:-translate-y-1 hover:shadow-lg hover:ring-orange-100">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-sm font-bold uppercase tracking-wide text-gray-500">Second-hand</p>
+                                <h3 className="mt-2 text-4xl font-extrabold text-slate-900">
+                                    {assets.filter(a => logs.some(log => log.assetId === a.id && log.action === "Check-in")).length}
+                                </h3>
+                            </div>
+                            <div className="rounded-2xl bg-orange-50 p-3 transition-colors group-hover:bg-orange-100">
+                                <History className="h-6 w-6 text-orange-600" />
+                            </div>
                         </div>
-                        <div className="rounded-xl bg-blue-50 p-3">
-                            <User className="h-6 w-6 text-blue-600" />
+                        <div className="mt-4 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full bg-orange-50 px-2 py-1 text-xs font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20">
+                                With history
+                            </span>
                         </div>
                     </div>
-                    <div className="mt-4 flex items-center gap-1 text-xs font-medium text-blue-600">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-                        Currently assigned
-                    </div>
-                </div>
 
-                <div className="flex flex-col justify-between rounded-2xl bg-white p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all hover:-translate-y-1">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <p className="text-sm font-bold text-orange-600">Second-hand</p>
-                            <h3 className="mt-2 text-4xl font-extrabold text-slate-900">
-                                {assets.filter(a => logs.some(log => log.assetId === a.id && log.action === "Check-in")).length}
-                            </h3>
+                    {/* In Use */}
+                    <div className="group relative flex flex-col justify-between rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition-all hover:-translate-y-1 hover:shadow-lg hover:ring-blue-100">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-sm font-bold uppercase tracking-wide text-gray-500">In Use</p>
+                                <h3 className="mt-2 text-4xl font-extrabold text-slate-900">{assets.filter(a => a.status === "In Use").length}</h3>
+                            </div>
+                            <div className="rounded-2xl bg-blue-50 p-3 transition-colors group-hover:bg-blue-100">
+                                <User className="h-6 w-6 text-blue-600" />
+                            </div>
                         </div>
-                        <div className="rounded-xl bg-orange-50 p-3">
-                            <History className="h-6 w-6 text-orange-600" />
+                        <div className="mt-4 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                                Assigned
+                            </span>
                         </div>
                     </div>
-                    <div className="mt-4 flex items-center gap-1 text-xs font-medium text-orange-600">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"></span>
-                        Has usage history
+
+                    {/* Disposed */}
+                    <div className="group relative flex flex-col justify-between rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition-all hover:-translate-y-1 hover:shadow-lg hover:ring-slate-300">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-sm font-bold uppercase tracking-wide text-gray-500">Disposed</p>
+                                <h3 className="mt-2 text-4xl font-extrabold text-slate-900">{assets.filter(a => a.status === "Disposed").length}</h3>
+                            </div>
+                            <div className="rounded-2xl bg-slate-100 p-3 transition-colors group-hover:bg-slate-200">
+                                <Trash2 className="h-6 w-6 text-slate-500" />
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10">
+                                Archive Items
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -452,12 +495,12 @@ function InventoryContent() {
                         <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                         <select
                             value={lifecycleFilter}
-                            onChange={(e) => setLifecycleFilter(e.target.value as "> 5 Years" | "< 5 Years" | "All")}
+                            onChange={(e) => setLifecycleFilter(e.target.value as "More than 5 Years" | "Less than 5 Years" | "All")}
                             className="w-full min-w-0 appearance-none rounded-md border border-slate-300 bg-white pl-10 pr-8 py-2 text-black focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
                             <option value="All">All Lifecycles</option>
-                            <option value="> 5 Years">&gt; 5 Years</option>
-                            <option value="< 5 Years">&lt; 5 Years</option>
+                            <option value="More than 5 Years">More than 5 Years</option>
+                            <option value="Less than 5 Years">Less than 5 Years</option>
                         </select>
                     </div>
                 </div>
@@ -774,7 +817,7 @@ function InventoryContent() {
                                         </div>
                                     </th>
                                 ))}
-                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-700" style={{ width: columnWidths.actions }}></th>
+                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-700" style={{ width: columnWidths.actions }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
