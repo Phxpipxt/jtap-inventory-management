@@ -2,7 +2,7 @@
 
 import { useInventory } from "@/hooks/useInventory";
 import { Asset } from "@/lib/types";
-import { useMemo, useState } from "react";
+import { useMemo, useState, Suspense } from "react";
 import { AssetHistoryModal } from "@/components/modals/AssetHistoryModal";
 import { AssetDetailModal } from "@/components/modals/AssetDetailModal";
 import { AlertModal } from "@/components/modals/AlertModal";
@@ -13,7 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSearchParams } from "next/navigation";
 import { TableSkeleton } from "@/components/skeletons/AppSkeletons";
 
-export default function DisposePage() {
+function DisposeContent() {
     const { assets, logs, updateAsset, loading } = useInventory(); // Ensure updateAsset is available
     const { user } = useAuth();
     const searchParams = useSearchParams();
@@ -741,5 +741,13 @@ export default function DisposePage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function DisposePage() {
+    return (
+        <Suspense fallback={<TableSkeleton />}>
+            <DisposeContent />
+        </Suspense>
     );
 }
