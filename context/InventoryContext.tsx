@@ -70,8 +70,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
                 adminUser,
                 details: "Initial stock in",
             };
-            await createAssetAction(asset, adminUser);
-            await createLog(log);
+            await createAssetAction(asset, adminUser, log);
+            // await createLog(log); // Handled in createAssetAction transaction
             return { asset, log };
         },
         onMutate: async ({ asset, adminUser }) => {

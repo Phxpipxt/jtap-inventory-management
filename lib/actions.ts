@@ -26,25 +26,44 @@ export async function getAssets(): Promise<Asset[]> {
     }));
 }
 
-export async function createAsset(asset: Asset, adminUser: string) {
-    // Create Asset and Images in transaction
+export async function createAsset(asset: Asset, adminUser: string, log?: LogEntry) {
     const { images, ...data } = asset;
 
-    await prisma.asset.create({
-        data: {
-            ...data,
-            lastUpdated: new Date(), // Always fresh
-            purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null,
-            warrantyExpiry: data.warrantyExpiry ? new Date(data.warrantyExpiry) : null,
-            distributionDate: data.distributionDate ? new Date(data.distributionDate) : null,
-            updatedBy: adminUser,
-            images: {
-                create: images?.map((img) => ({ data: img })) || []
+    await prisma.$transaction(async (tx: any) => {
+        // 1. Create Asset
+        await tx.asset.create({
+            data: {
+                ...data,
+                lastUpdated: new Date(),
+                purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null,
+                warrantyExpiry: data.warrantyExpiry ? new Date(data.warrantyExpiry) : null,
+                distributionDate: data.distributionDate ? new Date(data.distributionDate) : null,
+                updatedBy: adminUser,
+                images: {
+                    create: images?.map((img) => ({ data: img })) || []
+                }
             }
+        });
+
+        // 2. Create Log (if provided)
+        if (log) {
+            await tx.logEntry.create({
+                data: {
+                    id: log.id,
+                    assetId: log.assetId,
+                    computerNo: log.computerNo,
+                    serialNo: log.serialNo,
+                    action: log.action,
+                    adminUser: log.adminUser,
+                    details: log.details,
+                    timestamp: new Date(log.timestamp)
+                }
+            });
         }
     });
 
     revalidatePath("/inventory");
+    if (log) revalidatePath("/logs");
 }
 
 export async function updateAsset(asset: Asset, adminUser: string) {
