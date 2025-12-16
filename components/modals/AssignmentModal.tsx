@@ -31,9 +31,9 @@ export function AssignmentModal({ asset, isOpen, onClose, onSave }: AssignmentMo
 
         const updatedAsset: Asset = {
             ...asset,
-            owner: action === "Return" ? undefined : owner,
-            empId: action === "Return" ? undefined : empId,
-            department: action === "Return" ? undefined : (department as Department),
+            owner: action === "Return" ? null : owner,
+            empId: action === "Return" ? null : empId,
+            department: action === "Return" ? null : (department as Department),
             status: action === "Return" ? "In Stock" : "In Use",
             lastUpdated: new Date().toISOString(),
             updatedBy: user?.name || "Unknown", // Use user.name from auth

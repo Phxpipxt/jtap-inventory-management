@@ -38,7 +38,12 @@ export const BRANDS: Brand[] = ["Dell", "Lenovo", "HP", "Asus"];
 
 
 export const HDD_OPTIONS = ["128 GB", "256 GB", "512 GB", "1 TB"];
-export const RAM_OPTIONS = ["8 GB", "16 GB", "32 GB", "64 GB", "128 GB"];
+export const RAM_OPTIONS = [
+    // DDR4
+    "8 GB (DDR4)", "16 GB (DDR4)", "32 GB (DDR4)", "64 GB (DDR4)", "128 GB (DDR4)",
+    // DDR5
+    "8 GB (DDR5)", "16 GB (DDR5)", "32 GB (DDR5)", "64 GB (DDR5)", "128 GB (DDR5)"
+];
 
 export interface Asset {
     id: string; // Unique ID (e.g., UUID)
@@ -46,9 +51,9 @@ export interface Asset {
     serialNo: string;
     brand?: Brand | string; // Allow string for backward compatibility or other brands if needed, but UI will enforce Brand type
     model?: string;
-    owner?: string;
-    empId?: string;
-    department?: Department;
+    owner?: string | null;
+    empId?: string | null;
+    department?: Department | null;
     status: AssetStatus;
     purchaseDate?: string; // ISO Date
     warrantyExpiry?: string; // ISO Date
@@ -69,7 +74,7 @@ export interface LogEntry {
     assetId: string;
     computerNo: string;
     serialNo: string;
-    action: "Check-in" | "Check-out" | "Add" | "Update" | "Audit" | "Delete";
+    action: "Check-in" | "Check-out" | "Add" | "Update" | "Audit" | "Delete" | "Dispose";
     timestamp: string;
     adminUser: string;
     details?: string;

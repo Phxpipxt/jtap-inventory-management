@@ -144,6 +144,7 @@ export default function LogsPage() {
                             <option value="Delete">Delete</option>
                             <option value="Check-in">Check-in</option>
                             <option value="Check-out">Check-out</option>
+                            <option value="Dispose">Dispose</option>
                             <option value="Audit">Audit</option>
                         </select>
                     </div>
@@ -216,7 +217,8 @@ export default function LogsPage() {
                                         log.action === "Update" ? "bg-purple-100 text-purple-800 border border-purple-200" :
                                             log.action === "Check-in" ? "bg-sky-100 text-sky-800 border border-sky-200" :
                                                 log.action === "Check-out" ? "bg-amber-100 text-amber-800 border border-amber-200" :
-                                                    "bg-slate-100 text-slate-800 border border-slate-200"
+                                                    log.action === "Dispose" ? "bg-slate-700 text-slate-100 border border-slate-600" :
+                                                        "bg-slate-100 text-slate-800 border border-slate-200"
                                     }`}>
                                     {log.action}
                                 </span>
@@ -292,7 +294,8 @@ export default function LogsPage() {
                                                     log.action === "Update" ? "bg-purple-100 text-purple-800 border border-purple-200" :
                                                         log.action === "Check-in" ? "bg-sky-100 text-sky-800 border border-sky-200" :
                                                             log.action === "Check-out" ? "bg-amber-100 text-amber-800 border border-amber-200" :
-                                                                "bg-slate-100 text-slate-800 border border-slate-200"
+                                                                log.action === "Dispose" ? "bg-slate-700 text-slate-100 border border-slate-600" :
+                                                                    "bg-slate-100 text-slate-800 border border-slate-200"
                                                 }`}>
                                                 {log.action}
                                             </span>

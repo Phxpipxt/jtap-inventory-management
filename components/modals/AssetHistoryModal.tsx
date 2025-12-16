@@ -30,7 +30,7 @@ export function AssetHistoryModal({ asset, isOpen, onClose }: AssetHistoryModalP
                             <h2 className="text-lg font-bold text-slate-900">Usage History</h2>
                         </div>
                         <p className="text-xs text-slate-500 mt-1">
-                            {asset.computerNo} • {asset.brand} {asset.model}
+                            Computer No: {asset.computerNo}, Serial No: {asset.serialNo}, {asset.brand} {asset.model}
                         </p>
                     </div>
                     <button
@@ -66,20 +66,35 @@ export function AssetHistoryModal({ asset, isOpen, onClose }: AssetHistoryModalP
                                             </span>
                                         </div>
 
-                                        {log.details ? (
-                                            <span className="text-sm font-semibold text-slate-800 mt-1">
+                                        {log.action === "Check-out" && log.details?.startsWith("Assigned to") ? (
+                                            // Parse "Assigned to Name (ID: XXX, Dept: YYY)"
+                                            (() => {
+                                                const nameMatch = log.details?.match(/Assigned to (.*?) \(/);
+                                                const metaMatch = log.details?.match(/\((.*?)\)/);
+                                                const name = nameMatch ? nameMatch[1] : log.details;
+                                                const meta = metaMatch ? metaMatch[1] : "";
+
+                                                return (
+                                                    <div className="flex flex-col mt-0.5">
+                                                        <span className="text-sm font-bold text-slate-900">{name}</span>
+                                                        {meta && <span className="text-xs text-slate-500 font-medium">{meta}</span>}
+                                                    </div>
+                                                );
+                                            })()
+                                        ) : log.details ? (
+                                            <span className="text-sm font-medium text-slate-800 mt-1">
                                                 {log.details}
                                             </span>
                                         ) : (
-                                            <span className="text-sm text-slate-600 italic mt-1">
+                                            <span className="text-sm text-slate-500 italic mt-1">
                                                 No details provided
                                             </span>
                                         )}
 
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100">
-                                                <span className="opacity-75">Action by:</span>
-                                                <span className="font-medium text-slate-700">{log.adminUser}</span>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 uppercase tracking-wide">
+                                                <span>Action by:</span>
+                                                <span className="font-semibold text-slate-600">{log.adminUser}</span>
                                             </div>
                                         </div>
                                     </div>

@@ -21,7 +21,7 @@ interface InventoryContextType {
     loading: boolean;
     addAsset: (asset: Asset, adminUser: string) => Promise<void>;
     addAssets: (newAssetsList: Asset[], adminUser: string) => Promise<void>;
-    updateAsset: (updatedAsset: Asset, adminUser: string, action: "Check-in" | "Check-out" | "Update", details?: string) => Promise<void>;
+    updateAsset: (updatedAsset: Asset, adminUser: string, action: "Check-in" | "Check-out" | "Update" | "Dispose", details?: string) => Promise<void>;
     deleteAsset: (assetId: string, adminUser: string) => Promise<void>;
     deleteAssets: (assetIds: string[], adminUser: string) => Promise<void>;
     saveAuditLog: (log: AuditLog) => Promise<void>;
@@ -108,15 +108,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     });
 
     const updateAssetMutation = useMutation({
-        mutationFn: async ({ updatedAsset, adminUser, action, details }: { updatedAsset: Asset; adminUser: string; action: "Check-in" | "Check-out" | "Update"; details?: string }) => {
+        mutationFn: async ({ updatedAsset, adminUser, action, details }: { updatedAsset: Asset; adminUser: string; action: "Check-in" | "Check-out" | "Update" | "Dispose"; details?: string }) => {
             // Fetch current asset for distribution date logic if needed, but for mutation we just trust passed data + action
             // However, for the 'Check-in' log detail logic (Distributed: date), we need the old asset. 
             // We can pass it or fetch it, but let's assume client handles detail formatting or we keep it simple.
             // Re-implementing logic from original:
-            const oldAsset = assets.find(a => a.id === updatedAsset.id);
-            const logDetail = action === "Check-in" && oldAsset?.distributionDate
-                ? `${details} (Distributed: ${new Date(oldAsset.distributionDate).toLocaleDateString()})`
-                : details;
+            const logDetail = action === "Check-in" ? details : details; // Simplified as per request
 
             const log: LogEntry = {
                 id: crypto.randomUUID(),
@@ -140,10 +137,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             const previousAssets = queryClient.getQueryData<Asset[]>(["assets"]);
             const previousLogs = queryClient.getQueryData<LogEntry[]>(["logs"]);
 
-            const oldAsset = previousAssets?.find(a => a.id === updatedAsset.id);
-            const logDetail = action === "Check-in" && oldAsset?.distributionDate
-                ? `${details} (Distributed: ${new Date(oldAsset.distributionDate).toLocaleDateString()})`
-                : details;
+            const logDetail = details;
 
             const log: LogEntry = {
                 id: crypto.randomUUID(),
@@ -189,8 +183,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
                 details: "Asset deleted from inventory",
             };
 
-            await deleteAssetAction(assetId);
             await createLog(log);
+            await deleteAssetAction(assetId);
         },
         onMutate: async ({ assetId, adminUser }) => {
             await queryClient.cancelQueries({ queryKey: ["assets"] });
@@ -244,8 +238,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
                 details: "Batch delete",
             }));
 
-            await deleteAssetsAction(assetIds);
             await createLogs(newLogs);
+            await deleteAssetsAction(assetIds);
         },
         onMutate: async ({ assetIds, adminUser }) => {
             await queryClient.cancelQueries({ queryKey: ["assets"] });
@@ -383,7 +377,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         await addAssetsBatchMutation.mutateAsync({ newAssetsList, adminUser });
     };
 
-    const updateAsset = async (updatedAsset: Asset, adminUser: string, action: "Check-in" | "Check-out" | "Update", details?: string) => {
+    const updateAsset = async (updatedAsset: Asset, adminUser: string, action: "Check-in" | "Check-out" | "Update" | "Dispose", details?: string) => {
         await updateAssetMutation.mutateAsync({ updatedAsset, adminUser, action, details });
     };
 

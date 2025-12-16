@@ -6,23 +6,38 @@ import { useMemo, useState } from "react";
 import { AssetHistoryModal } from "@/components/modals/AssetHistoryModal";
 import { AssetDetailModal } from "@/components/modals/AssetDetailModal";
 import { AlertModal } from "@/components/modals/AlertModal";
-import { Eye, Search, History, Upload, Trash2, AlertTriangle, CheckSquare, Square, X, CheckCircle2 } from "lucide-react";
+import { ExportOptionsModal } from "@/components/modals/ExportOptionsModal";
+import { Eye, Search, History, Upload, Trash2, AlertTriangle, CheckSquare, Square, X, CheckCircle2, Download, RotateCcw } from "lucide-react";
+
 import { useAuth } from "@/context/AuthContext";
+import { useSearchParams } from "next/navigation";
 import { TableSkeleton } from "@/components/skeletons/AppSkeletons";
 
 export default function DisposePage() {
     const { assets, logs, updateAsset, loading } = useInventory(); // Ensure updateAsset is available
     const { user } = useAuth();
+    const searchParams = useSearchParams();
+    const initialTab = searchParams.get("tab");
+
     const [searchTerm, setSearchTerm] = useState("");
-    const [activeTab, setActiveTab] = useState<"candidates" | "disposed">("candidates");
+    const [activeTab, setActiveTab] = useState<"candidates" | "disposed">(initialTab === "disposed" ? "disposed" : "candidates");
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
+    // Export Modal State
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [exportAsset, setExportAsset] = useState<Asset | null>(null);
+
     const [recentlyDisposedAssets, setRecentlyDisposedAssets] = useState<Asset[] | null>(null);
     const [targetDisposeIds, setTargetDisposeIds] = useState<Set<string> | null>(null);
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+
+    // Restore Confirmation State
+    const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
+    const [restoreAssetCandidate, setRestoreAssetCandidate] = useState<Asset | null>(null);
+    const [restoreReason, setRestoreReason] = useState("");
 
     // Initiate bulk dispose
     const handleBulkDisposeClick = () => {
@@ -34,6 +49,34 @@ export default function DisposePage() {
     const handleSingleDisposeClick = (id: string) => {
         setTargetDisposeIds(new Set([id]));
         setConfirmModalOpen(true);
+    };
+
+    const handleRestoreClick = (asset: Asset) => {
+        setRestoreAssetCandidate(asset);
+        setRestoreReason("");
+        setIsRestoreConfirmOpen(true);
+    };
+
+    const confirmRestore = async () => {
+        if (!restoreAssetCandidate) return;
+        if (!restoreReason.trim()) {
+            showAlert("Error", "Please provide a reason for restoration", "error");
+            return;
+        }
+
+        const updatedAsset: Asset = {
+            ...restoreAssetCandidate,
+            status: "In Stock",
+            updatedBy: user?.name || "admin",
+            lastUpdated: new Date().toISOString(),
+        };
+        await updateAsset(updatedAsset, user?.name || "admin", "Update", `Restored: ${restoreReason}`);
+
+        setIsRestoreConfirmOpen(false);
+        setRestoreAssetCandidate(null);
+        setRestoreReason("");
+
+        showAlert("Restored", `Asset ${restoreAssetCandidate.computerNo} has been restored to stock.`, "success");
     };
 
     const [alertState, setAlertState] = useState<{ isOpen: boolean; title: string; message: string | React.ReactNode; type: "default" | "error" | "warning" | "success" }>({
@@ -115,7 +158,7 @@ export default function DisposePage() {
             await updateAsset(
                 { ...asset, status: "Disposed" },
                 user.name,
-                "Update",
+                "Dispose",
                 "Asset Disposed"
             );
         }
@@ -223,6 +266,11 @@ export default function DisposePage() {
     const handleViewDetails = (asset: Asset) => {
         setSelectedAsset(asset);
         setIsViewModalOpen(true);
+    };
+
+    const handleOpenExport = (asset: Asset) => {
+        setExportAsset(asset);
+        setIsExportModalOpen(true);
     };
 
 
@@ -363,6 +411,16 @@ export default function DisposePage() {
                                         </td>
                                         <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                                             <div className="flex items-center justify-end gap-2">
+                                                {activeTab === "disposed" && (
+                                                    <button
+                                                        onClick={() => handleRestoreClick(asset)}
+                                                        className="inline-flex items-center gap-1 rounded bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                                        title="Restore to Stock"
+                                                    >
+                                                        <RotateCcw className="h-3.5 w-3.5" />
+                                                        Restore
+                                                    </button>
+                                                )}
                                                 {activeTab === "candidates" && (
                                                     <button
                                                         onClick={() => handleSingleDisposeClick(asset.id)}
@@ -388,6 +446,13 @@ export default function DisposePage() {
                                                 >
                                                     <History className="h-3.5 w-3.5" />
                                                     History
+                                                </button>
+                                                <button
+                                                    onClick={() => handleOpenExport(asset)}
+                                                    className="inline-flex items-center gap-1 rounded bg-white border border-slate-200 px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                                                    title="Export Options"
+                                                >
+                                                    <Upload className="h-3.5 w-3.5" />
                                                 </button>
                                             </div>
                                         </td>
@@ -451,6 +516,15 @@ export default function DisposePage() {
                                 </div>
 
                                 <div className="flex gap-2">
+                                    {activeTab === "disposed" && (
+                                        <button
+                                            onClick={() => handleRestoreClick(asset)}
+                                            className="flex items-center gap-1 rounded bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
+                                        >
+                                            <RotateCcw className="h-3.5 w-3.5" />
+                                            Restore
+                                        </button>
+                                    )}
                                     {activeTab === "candidates" && (
                                         <button
                                             onClick={() => handleSingleDisposeClick(asset.id)}
@@ -473,6 +547,13 @@ export default function DisposePage() {
                                     >
                                         <History className="h-3.5 w-3.5" />
                                         History
+                                    </button>
+                                    <button
+                                        onClick={() => handleOpenExport(asset)}
+                                        className="flex items-center justify-center gap-2 rounded-md bg-white border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                                        title="Export/Print Options"
+                                    >
+                                        <Upload className="h-4 w-4" />
                                     </button>
                                 </div>
                             </div>
@@ -499,6 +580,17 @@ export default function DisposePage() {
                     onClose={() => {
                         setIsViewModalOpen(false);
                         setSelectedAsset(null);
+                    }}
+                />
+            )}
+
+            {isExportModalOpen && exportAsset && (
+                <ExportOptionsModal
+                    asset={exportAsset}
+                    isOpen={isExportModalOpen}
+                    onClose={() => {
+                        setIsExportModalOpen(false);
+                        setExportAsset(null);
                     }}
                 />
             )}
@@ -588,6 +680,61 @@ export default function DisposePage() {
                                 className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition-colors shadow-sm"
                             >
                                 Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Restore Confirmation Modal */}
+            {isRestoreConfirmOpen && restoreAssetCandidate && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                        <div className="mb-4 flex items-center gap-2 text-slate-900 border-b border-slate-100 pb-3">
+                            <AlertTriangle className="h-6 w-6 text-orange-500" />
+                            <h2 className="text-lg font-bold">Confirm Restore</h2>
+                        </div>
+
+                        <div className="mb-6 space-y-4">
+                            <p className="text-slate-600">
+                                Are you sure you want to restore this asset to stock?
+                            </p>
+                            <div className="flex flex-col items-center justify-center rounded-lg bg-slate-50 p-4 border border-slate-200">
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Computer No.</span>
+                                <span className="text-2xl font-bold text-slate-900 tracking-tight">{restoreAssetCandidate.computerNo}</span>
+                                <span className="text-sm text-slate-500 mt-1">{restoreAssetCandidate.brand} {restoreAssetCandidate.model}</span>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                    Reason for Restoration <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    value={restoreReason}
+                                    onChange={(e) => setRestoreReason(e.target.value)}
+                                    placeholder="e.g., Repaired and ready for use, Mistakenly disposed..."
+                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    rows={3}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => {
+                                    setIsRestoreConfirmOpen(false);
+                                    setRestoreAssetCandidate(null);
+                                }}
+                                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-slate-700 hover:bg-slate-50 transition-colors font-medium cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmRestore}
+                                className="rounded-md bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700 transition-colors shadow-sm font-medium flex items-center gap-2 cursor-pointer"
+                            >
+                                <RotateCcw className="h-4 w-4" />
+                                Confirm Restore
                             </button>
                         </div>
                     </div>

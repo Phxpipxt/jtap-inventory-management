@@ -68,7 +68,7 @@ export default function SecondHandPage() {
                     "Brand": asset.brand || "-",
                     "Model": asset.model || "-",
                     "Status": asset.status,
-                    "Last Return By": lastReturn?.details?.replace("Returned from ", "") || "-",
+                    "Last Return By": lastReturn?.details?.replace("Returned from ", "").split("(")[0].trim() || "-",
                     "Last Return Date": lastReturn ? new Date(lastReturn.timestamp).toLocaleDateString() : "-",
                 };
             });
@@ -149,7 +149,7 @@ export default function SecondHandPage() {
                                     {lastReturn ? (
                                         <div className="flex flex-col">
                                             <span className="text-slate-900 text-sm font-medium" >
-                                                {lastReturn.details?.replace("Returned from ", "") || "Unknown"}
+                                                {lastReturn.details?.replace("Returned from ", "").split("(")[0].trim() || "Unknown"}
                                             </span>
                                             <span className="text-xs text-slate-500">{new Date(lastReturn.timestamp).toLocaleDateString()}</span>
                                         </div>
@@ -221,7 +221,7 @@ export default function SecondHandPage() {
                                                 {lastReturn ? (
                                                     <div className="flex flex-col">
                                                         <span className="text-slate-900 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title={lastReturn.details}>
-                                                            {lastReturn.details?.replace("Returned from ", "") || "Unknown"}
+                                                            {lastReturn.details?.replace("Returned from ", "").split("(")[0].trim() || "Unknown"}
                                                         </span>
                                                         <span className="text-xs">{new Date(lastReturn.timestamp).toLocaleDateString()}</span>
                                                     </div>

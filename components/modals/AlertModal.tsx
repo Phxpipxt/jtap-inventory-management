@@ -42,7 +42,7 @@ export function AlertModal({ isOpen, onClose, title, message, type = "default", 
                         <X className="h-5 w-5" />
                     </button>
                 </div>
-                <p className="mb-6 text-slate-600 whitespace-pre-wrap">{message}</p>
+                <div className="mb-6 text-slate-600 whitespace-pre-wrap">{message}</div>
                 <div className="flex justify-end gap-2">
                     {showCancel && (
                         <button

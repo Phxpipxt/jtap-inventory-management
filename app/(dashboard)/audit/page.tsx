@@ -382,11 +382,16 @@ export default function AuditPage() {
                                 <div className="relative flex-1">
                                     <ScanBarcode className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                                     <input
-                                        readOnly
                                         type="text"
-                                        value={currentInput || "Waiting for scanner..."}
-                                        className="w-full rounded-md border border-slate-300 bg-slate-50 pl-10 pr-4 py-3 text-base text-slate-500 focus:outline-none md:py-2 md:text-sm cursor-not-allowed"
-                                        placeholder="Use Scanner or Camera"
+                                        value={currentInput}
+                                        onChange={(e) => setCurrentInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                handleScan(e);
+                                            }
+                                        }}
+                                        className="w-full rounded-md border border-slate-300 bg-white pl-10 pr-4 py-3 text-base text-black focus:border-blue-500 focus:outline-none md:py-2 md:text-sm"
+                                        placeholder="Scan or Type Asset Tag"
                                     />
                                 </div>
                                 <button

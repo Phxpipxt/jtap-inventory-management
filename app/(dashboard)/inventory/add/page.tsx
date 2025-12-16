@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useInventory } from "@/hooks/useInventory";
-import { Asset, AssetStatus, Department, DEPARTMENTS, BRANDS } from "@/lib/types";
+import { Asset, AssetStatus, Department, DEPARTMENTS, BRANDS, RAM_OPTIONS } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
 import { ArrowLeft, ScanBarcode, Save, Camera, Calendar } from "lucide-react";
 import Link from "next/link";
@@ -85,19 +85,73 @@ export default function AddAssetPage() {
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (images.length >= 3) return;
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            const remainingSlots = 3 - images.length;
+            const filesToProcess = Array.from(files).slice(0, remainingSlots);
 
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                if (reader.result) {
-                    setImages(prev => [...prev, reader.result as string]);
+            filesToProcess.forEach(file => {
+                if (file.size > 25 * 1024 * 1024) {
+                    alert(`File ${file.name} is too large (max 25MB).`);
+                    return;
                 }
-            };
-            reader.readAsDataURL(file);
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    if (reader.result) {
+                        setImages(prev => {
+                            if (prev.length >= 3) return prev;
+                            return [...prev, reader.result as string];
+                        });
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
         }
-        // Reset input value to allow same file selection
         e.target.value = "";
+    };
+
+    // Drag & Drop State
+    const [isDragging, setIsDragging] = useState(false);
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+
+        if (images.length >= 3) return;
+
+        const files = Array.from(e.dataTransfer.files);
+        // Process only first file or up to remaining limit
+        const remainingSlots = 3 - images.length;
+        const filesToProcess = files.slice(0, remainingSlots);
+
+        filesToProcess.forEach(file => {
+            if (file.size > 25 * 1024 * 1024) {
+                alert(`File ${file.name} is too large (max 25MB).`);
+                return;
+            }
+            if (file.type.startsWith("image/")) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    if (reader.result) {
+                        setImages(prev => {
+                            if (prev.length >= 3) return prev;
+                            return [...prev, reader.result as string];
+                        });
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
     };
 
     const startCamera = async () => {
@@ -386,6 +440,77 @@ export default function AddAssetPage() {
                         </div>
                     </div>
 
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Asset Images <span className="text-slate-400 font-normal">(Max 3)</span></label>
+                        <div className="flex flex-col gap-4">
+                            {images.length > 0 && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {images.map((img, index) => (
+                                        <div key={index} className="relative aspect-square w-full rounded-lg overflow-hidden border border-slate-200 group bg-slate-100">
+                                            <img src={img} alt={`Asset ${index + 1}`} className="w-full h-full object-cover" />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeImage(index)}
+                                                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 cursor-pointer shadow-sm"
+                                                title="Remove Image"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                            </button>
+                                            <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                                                {index + 1}/3
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="flex flex-col gap-2 sm:flex-row items-start">
+                                {images.length < 3 && (
+                                    <>
+                                        <div
+                                            className={`flex flex-col items-center justify-center gap-2 w-full md:w-auto p-4 rounded-lg border-2 border-dashed transition-colors ${isDragging ? "border-blue-500 bg-blue-50" : "border-slate-300 hover:border-blue-400"}`}
+                                            onDragOver={handleDragOver}
+                                            onDragLeave={handleDragLeave}
+                                            onDrop={handleDrop}
+                                        >
+                                            <p className="text-sm text-slate-600 font-medium">
+                                                {isDragging ? "Drop images here" : "Drag & Drop images here"}
+                                            </p>
+                                            <p className="text-xs text-slate-400">or</p>
+                                            <label className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm border border-slate-300 hover:bg-slate-50 md:w-auto w-full">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                                {images.length > 0 ? "Add Another Photo" : "Upload Photo"}
+                                                <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept="image/png, image/jpeg"
+                                                    multiple
+                                                    onChange={handleImageUpload}
+                                                />
+                                            </label>
+                                            <p className="text-xs text-slate-500 text-center md:text-left">
+                                                Choose an image file (PNG/JPEG, max 25MB)
+                                            </p>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={startCamera}
+                                            className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer w-full md:w-auto mt-2 sm:mt-0"
+                                            disabled={isCameraOpen}
+                                        >
+                                            <Camera className="h-4 w-4" />
+                                            Take Photo
+                                        </button>
+                                    </>
+                                )}
+                                {images.length >= 3 && (
+                                    <p className="text-sm text-amber-600 py-2">Maximum of 3 images reached.</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-700">Computer No. (Asset Tag) <span className="text-red-500">*</span></label>
                         <div className="flex flex-col gap-2 md:flex-row">
@@ -562,12 +687,9 @@ export default function AddAssetPage() {
                                     className="w-full rounded-md border border-slate-300 px-4 py-3 text-black focus:border-blue-500 focus:outline-none md:py-2 md:text-sm appearance-none bg-white"
                                 >
                                     <option value="">Select RAM</option>
-                                    {/* 8 GB, 16 GB, 32 GB, 64 GB, 128 GB */}
-                                    <option value="8 GB">8 GB</option>
-                                    <option value="16 GB">16 GB</option>
-                                    <option value="32 GB">32 GB</option>
-                                    <option value="64 GB">64 GB</option>
-                                    <option value="128 GB">128 GB</option>
+                                    {RAM_OPTIONS.map((opt) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div className="space-y-2">
@@ -584,66 +706,7 @@ export default function AddAssetPage() {
                     </div>
                 </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Asset Images <span className="text-slate-400 font-normal">(Max 3)</span></label>
-                    <div className="flex flex-col gap-4">
-                        {images.length > 0 && (
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                {images.map((img, index) => (
-                                    <div key={index} className="relative aspect-square w-full rounded-lg overflow-hidden border border-slate-200 group bg-slate-100">
-                                        <img src={img} alt={`Asset ${index + 1}`} className="w-full h-full object-cover" />
-                                        <button
-                                            type="button"
-                                            onClick={() => removeImage(index)}
-                                            className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 cursor-pointer shadow-sm"
-                                            title="Remove Image"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                                        </button>
-                                        <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                                            {index + 1}/3
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
 
-                        <div className="flex flex-col gap-2 sm:flex-row items-start">
-                            {images.length < 3 && (
-                                <>
-                                    <div className="flex flex-col gap-2 w-full md:w-auto">
-                                        <label className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm border border-slate-300 hover:bg-slate-50 md:w-auto w-full">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                                            {images.length > 0 ? "Add Another Photo" : "Upload Photo"}
-                                            <input
-                                                type="file"
-                                                className="hidden"
-                                                accept="image/png, image/jpeg"
-                                                onChange={handleImageUpload}
-                                            />
-                                        </label>
-                                        <p className="text-xs text-slate-500 text-center md:text-left">
-                                            Choose an image file (PNG/JPEG, max 25MB)
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={startCamera}
-                                        className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer w-full md:w-auto"
-                                        disabled={isCameraOpen}
-                                    >
-                                        <Camera className="h-4 w-4" />
-                                        Take Photo
-                                    </button>
-                                </>
-                            )}
-                            {images.length >= 3 && (
-                                <p className="text-sm text-amber-600 py-2">Maximum of 3 images reached.</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
 
                 <div className="flex justify-end pt-4">
                     <button

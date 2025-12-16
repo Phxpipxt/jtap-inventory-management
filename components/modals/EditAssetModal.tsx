@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Asset, Department, BRANDS } from "@/lib/types";
+import { useInventory } from "@/hooks/useInventory";
+import { Asset, Department, BRANDS, RAM_OPTIONS } from "@/lib/types";
 import { X, Save, Calendar, Camera } from "lucide-react";
 
 interface EditAssetModalProps {
@@ -11,14 +12,27 @@ interface EditAssetModalProps {
 }
 
 export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModalProps) {
+    // Helper to format ISO date string to YYYY-MM-DD for input[type="date"]
+    const formatDateForInput = (dateString?: string) => {
+        if (!dateString) return "";
+        try {
+            // Check if it's already YYYY-MM-DD
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return dateString;
+            return new Date(dateString).toISOString().split('T')[0];
+        } catch (e) {
+            return "";
+        }
+    };
+
     const { user } = useAuth();
+    const { assets } = useInventory();
     const [computerNo, setComputerNo] = useState(asset.computerNo);
     const [serialNo, setSerialNo] = useState(asset.serialNo);
     const [brand, setBrand] = useState(asset.brand || "");
     const [model, setModel] = useState(asset.model || "");
     const [status, setStatus] = useState<Asset["status"]>(asset.status);
-    const [purchaseDate, setPurchaseDate] = useState(asset.purchaseDate || "");
-    const [warrantyExpiry, setWarrantyExpiry] = useState(asset.warrantyExpiry || "");
+    const [purchaseDate, setPurchaseDate] = useState(formatDateForInput(asset.purchaseDate));
+    const [warrantyExpiry, setWarrantyExpiry] = useState(formatDateForInput(asset.warrantyExpiry));
     const [tags, setTags] = useState(asset.tags?.join(", ") || "");
     const [remarks, setRemarks] = useState(asset.remarks || "");
     const [hdd, setHdd] = useState(asset.hdd || "");
@@ -32,6 +46,9 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
         asset.images && asset.images.length > 0 ? asset.images : (asset.image ? [asset.image] : [])
     );
 
+    // Drag & Drop State
+    const [isDragging, setIsDragging] = useState(false);
+
     useEffect(() => {
         if (isOpen) {
             setComputerNo(asset.computerNo);
@@ -39,8 +56,8 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
             setBrand(asset.brand || "");
             setModel(asset.model || "");
             setStatus(asset.status);
-            setPurchaseDate(asset.purchaseDate || "");
-            setWarrantyExpiry(asset.warrantyExpiry || "");
+            setPurchaseDate(formatDateForInput(asset.purchaseDate));
+            setWarrantyExpiry(formatDateForInput(asset.warrantyExpiry));
             setTags(asset.tags?.join(", ") || "");
             setRemarks(asset.remarks || "");
             setHdd(asset.hdd || "");
@@ -59,6 +76,17 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
         e.preventDefault();
         if (!user?.name) {
             alert("User information is not available. Cannot save changes.");
+            return;
+        }
+
+        // Check for duplicates (excluding self)
+        const isDuplicate = assets.some(a =>
+            a.id !== asset.id &&
+            (a.computerNo === computerNo || a.serialNo === serialNo)
+        );
+
+        if (isDuplicate) {
+            alert("Another asset with this Computer No or Serial No already exists.");
             return;
         }
 
@@ -86,17 +114,69 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
         onClose();
     };
 
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+
+        if (images.length >= 3) return;
+
+        const files = Array.from(e.dataTransfer.files);
+        const remainingSlots = 3 - images.length;
+        const filesToProcess = files.slice(0, remainingSlots);
+
+        filesToProcess.forEach(file => {
+            if (file.size > 25 * 1024 * 1024) {
+                alert(`File ${file.name} is too large (max 25MB).`);
+                return;
+            }
+            if (file.type.startsWith("image/")) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    if (reader.result) {
+                        setImages(prev => {
+                            if (prev.length >= 3) return prev;
+                            return [...prev, reader.result as string];
+                        });
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    };
+
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (images.length >= 3) return;
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                if (reader.result) {
-                    setImages(prev => [...prev, reader.result as string]);
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            const remainingSlots = 3 - images.length;
+            const filesToProcess = Array.from(files).slice(0, remainingSlots);
+
+            filesToProcess.forEach(file => {
+                if (file.size > 25 * 1024 * 1024) {
+                    alert(`File ${file.name} is too large (max 25MB).`);
+                    return;
                 }
-            };
-            reader.readAsDataURL(file);
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    if (reader.result) {
+                        setImages(prev => {
+                            if (prev.length >= 3) return prev;
+                            return [...prev, reader.result as string];
+                        });
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
         }
         e.target.value = ""; // Reset
     };
@@ -125,6 +205,60 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
                             </label>
                             <div className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">
                                 {user?.name}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 md:col-span-2">
+                            <label className="text-sm font-medium text-slate-700">Asset Images</label>
+                            <p className="text-xs text-slate-500">
+                                Upload up to 3 images (PNG/JPEG, max 25MB). Or drag and drop.
+                            </p>
+                            <div className="flex flex-col gap-4">
+                                {images.length > 0 && (
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        {images.map((img, index) => (
+                                            <div key={index} className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 group bg-slate-50">
+                                                <img src={img} alt={`Preview ${index + 1}`} className="h-full w-full object-cover" />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeImage(index)}
+                                                    className="absolute top-1 right-1 rounded-full bg-red-500 p-1 text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {images.length < 3 && (
+                                    <div
+                                        className={`flex flex-col gap-2 w-full md:w-auto p-4 rounded-lg border-2 border-dashed transition-colors ${isDragging ? "border-blue-500 bg-blue-50" : "border-slate-300 hover:border-blue-400"}`}
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
+                                    >
+                                        <div className="flex flex-col items-center justify-center gap-2">
+                                            <p className="text-sm text-slate-600 font-medium">
+                                                {isDragging ? "Drop images here" : "Drag & Drop images here"}
+                                            </p>
+                                            <p className="text-xs text-slate-400">or</p>
+                                            <label className="cursor-pointer inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm border border-slate-300 hover:bg-slate-50 md:w-auto w-full">
+                                                {images.length > 0 ? "Add Another Photo" : "Upload Photo"}
+                                                <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept="image/png, image/jpeg"
+                                                    multiple
+                                                    onChange={handleImageUpload}
+                                                />
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+                                {images.length >= 3 && (
+                                    <p className="text-xs text-amber-600">Maximum of 3 images reached.</p>
+                                )}
                             </div>
                         </div>
 
@@ -261,11 +395,9 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
                                         className="w-full rounded-md border border-slate-300 px-4 py-2 text-black focus:border-blue-500 focus:outline-none bg-white"
                                     >
                                         <option value="">Select RAM</option>
-                                        <option value="8 GB">8 GB</option>
-                                        <option value="16 GB">16 GB</option>
-                                        <option value="32 GB">32 GB</option>
-                                        <option value="64 GB">64 GB</option>
-                                        <option value="128 GB">128 GB</option>
+                                        {RAM_OPTIONS.map((opt) => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div className="space-y-2">
@@ -284,50 +416,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
 
                     </div>
 
-                    <div className="space-y-2 md:col-span-2">
-                        <label className="text-sm font-medium text-slate-700">Asset Images</label>
-                        <p className="text-xs text-slate-500">
-                            Upload up to 3 images (PNG/JPEG, max 25MB).
-                        </p>
-                        <div className="flex flex-col gap-4">
-                            {images.length > 0 && (
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    {images.map((img, index) => (
-                                        <div key={index} className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 group bg-slate-50">
-                                            <img src={img} alt={`Preview ${index + 1}`} className="h-full w-full object-cover" />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeImage(index)}
-                                                className="absolute top-1 right-1 rounded-full bg-red-500 p-1 text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
 
-                            {images.length < 3 && (
-                                <div className="flex flex-col gap-2 w-full md:w-auto">
-                                    <div className="flex gap-2">
-                                        <label className="cursor-pointer inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm border border-slate-300 hover:bg-slate-50 md:w-auto w-full">
-                                            {images.length > 0 ? "Add Another Photo" : "Upload Photo"}
-                                            <input
-                                                type="file"
-                                                className="hidden"
-                                                accept="image/png, image/jpeg"
-                                                onChange={handleImageUpload}
-                                            />
-                                        </label>
-
-                                    </div>
-                                </div>
-                            )}
-                            {images.length >= 3 && (
-                                <p className="text-xs text-amber-600">Maximum of 3 images reached.</p>
-                            )}
-                        </div>
-                    </div>
 
                     <div className="flex justify-end pt-4">
                         <button
