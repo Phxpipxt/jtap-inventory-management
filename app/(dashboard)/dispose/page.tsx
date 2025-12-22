@@ -12,6 +12,9 @@ import { Eye, Search, History, Upload, Trash2, AlertTriangle, CheckSquare, Squar
 import { useAuth } from "@/context/AuthContext";
 import { useSearchParams } from "next/navigation";
 import { TableSkeleton } from "@/components/skeletons/AppSkeletons";
+import { motion } from "framer-motion";
+
+
 
 function DisposeContent() {
     const { assets, logs, updateAsset, loading } = useInventory(); // Ensure updateAsset is available
@@ -277,7 +280,12 @@ function DisposeContent() {
     if (loading) return <TableSkeleton />;
 
     return (
-        <div className="space-y-6 pb-20 md:pb-0">
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6 pb-20 md:pb-0 font-inter"
+        >
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Asset Disposal</h1>
@@ -329,17 +337,17 @@ function DisposeContent() {
                 {activeTab === "candidates" && selectedIds.size > 0 && (
                     <button
                         onClick={handleBulkDisposeClick}
-                        className="flex items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 shadow-sm cursor-pointer animate-in fade-in"
+                        className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-500 to-pink-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-red-500/20 transition-all hover:shadow-red-500/40 hover:scale-[1.02] active:scale-[0.98] animate-in fade-in"
                     >
-                        <Trash2 className="h-4 w-4" />
-                        Dispose Selected ({selectedIds.size})
+                        <Trash2 className="h-4 w-4 transition-transform group-hover:rotate-12" />
+                        <span>Dispose Selected ({selectedIds.size})</span>
                     </button>
                 )}
 
                 {(activeTab === "candidates" || activeTab === "disposed") && (
                     <button
                         onClick={handleExport}
-                        className="flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 shadow-sm cursor-pointer"
+                        className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                     >
                         <Upload className="h-4 w-4" />
                         Export Report
@@ -509,49 +517,55 @@ function DisposeContent() {
                                 </span>
                             </div>
 
-                            <div className="border-t border-slate-100 pt-3 flex justify-between items-center">
-                                <div>
-                                    <p className="text-xs font-semibold text-slate-500">Age</p>
-                                    <p className="text-sm font-medium text-slate-900">{calculateAge(asset.purchaseDate)}</p>
+                            <div className="border-t border-slate-100 pt-3 flex flex-col gap-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-500">Age</p>
+                                        <p className="text-sm font-medium text-slate-900">{calculateAge(asset.purchaseDate)}</p>
+                                    </div>
                                 </div>
 
-                                <div className="flex gap-2">
+                                <div className="grid grid-cols-4 gap-2">
                                     {activeTab === "disposed" && (
-                                        <button
-                                            onClick={() => handleRestoreClick(asset)}
-                                            className="flex items-center gap-1 rounded bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
-                                        >
-                                            <RotateCcw className="h-3.5 w-3.5" />
-                                            Restore
-                                        </button>
+                                        <div className="col-span-4">
+                                            <button
+                                                onClick={() => handleRestoreClick(asset)}
+                                                className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-50 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-100"
+                                            >
+                                                <RotateCcw className="h-4 w-4" />
+                                                Restore Asset
+                                            </button>
+                                        </div>
                                     )}
                                     {activeTab === "candidates" && (
-                                        <button
-                                            onClick={() => handleSingleDisposeClick(asset.id)}
-                                            className="flex items-center gap-1 rounded bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                            Dispose
-                                        </button>
+                                        <div className="col-span-4">
+                                            <button
+                                                onClick={() => handleSingleDisposeClick(asset.id)}
+                                                className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-50 py-2.5 text-sm font-bold text-red-700 hover:bg-red-100 transition-colors border border-red-100"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                                Dispose Asset
+                                            </button>
+                                        </div>
                                     )}
                                     <button
                                         onClick={() => handleViewDetails(asset)}
-                                        className="flex items-center gap-1 rounded bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                                        className="col-span-2 flex items-center justify-center gap-2 rounded-lg bg-blue-50 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors border border-blue-100"
                                     >
                                         <Eye className="h-3.5 w-3.5" />
                                         Details
                                     </button>
                                     <button
                                         onClick={() => handleViewHistory(asset)}
-                                        className="flex items-center gap-1 rounded bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 transition-colors"
+                                        className="col-span-1 flex items-center justify-center rounded-lg bg-slate-50 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200"
+                                        title="View History"
                                     >
-                                        <History className="h-3.5 w-3.5" />
-                                        History
+                                        <History className="h-4 w-4" />
                                     </button>
                                     <button
                                         onClick={() => handleOpenExport(asset)}
-                                        className="flex items-center justify-center gap-2 rounded-md bg-white border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-                                        title="Export/Print Options"
+                                        className="col-span-1 flex items-center justify-center rounded-lg bg-white border border-slate-200 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                                        title="Export"
                                     >
                                         <Upload className="h-4 w-4" />
                                     </button>
@@ -740,7 +754,7 @@ function DisposeContent() {
                     </div>
                 </div>
             )}
-        </div>
+        </motion.div>
     );
 }
 

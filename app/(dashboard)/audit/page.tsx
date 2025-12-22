@@ -4,9 +4,10 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Asset, AuditLog } from "@/lib/types";
 import { useInventory } from "@/hooks/useInventory";
 import { useAuth } from "@/context/AuthContext";
-import { ScanBarcode, CheckCircle, AlertCircle, RefreshCw, Download, Camera, X, Upload } from "lucide-react";
+import { ScanBarcode, CheckCircle, AlertCircle, RefreshCw, Download, Camera, X, Upload, User } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import { AlertModal } from "@/components/modals/AlertModal";
+import { motion } from "framer-motion";
 
 export default function AuditPage() {
     const { assets, loading, saveAuditLog } = useInventory();
@@ -123,7 +124,19 @@ export default function AuditPage() {
                     }
                 ).catch((err) => {
                     console.error("Error starting scanner", err);
-                    showAlert("Camera Error", "Could not start camera. Please ensure camera permissions are granted.", "error");
+                    let errorMessage = "Could not start camera.";
+                    let errorTitle = "Camera Error";
+
+                    if (err.name === "NotAllowedError" || err.toString().includes("Permission dismissed")) {
+                        errorTitle = "Permission Denied";
+                        errorMessage = "Camera access was denied. Please enable camera permissions in your browser settings and reload the page.";
+                    } else if (err.name === "NotFoundError") {
+                        errorMessage = "No camera found on this device.";
+                    } else if (err.name === "NotReadableError") {
+                        errorMessage = "Camera is currently in use by another application.";
+                    }
+
+                    showAlert(errorTitle, errorMessage, "error");
                     setIsScanning(false);
                 });
             });
@@ -248,10 +261,18 @@ export default function AuditPage() {
         setCurrentInput("");
     };
 
+
+
     if (loading) return <div className="p-8">Loading...</div>;
 
     return (
-        <div className="space-y-6 pb-20 md:pb-0">
+
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6 pb-20 md:pb-0 font-inter"
+        >
             <AlertModal
                 isOpen={alertState.isOpen}
                 onClose={() => setAlertState(prev => ({ ...prev, isOpen: false }))}
@@ -259,34 +280,47 @@ export default function AuditPage() {
                 message={alertState.message}
                 type={alertState.type}
             />
+
+            {/* Header */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <h1 className="text-2xl font-bold text-slate-800">Asset Audit</h1>
+                <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Stock Audit</h1>
+                    <p className="text-sm text-slate-500 mt-1">Verify physical assets against the system inventory.</p>
+                </div>
+
                 {auditStatus === "Idle" || auditStatus === "Completed" ? (
                     <button
                         onClick={handleStartClick}
-                        className="flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-3 text-base font-medium text-white hover:bg-blue-700 md:w-auto md:py-2 md:text-sm cursor-pointer"
-                        title="Start a New Audit Session"
+                        className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-500/20 transition-all hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98]"
                     >
-                        <RefreshCw className="h-4 w-4" />
-                        Start New Audit
+                        <ScanBarcode className="h-4 w-4 transition-transform group-hover:scale-110" />
+                        <span>Start New Audit</span>
                     </button>
                 ) : (
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-                        <span className="text-sm font-medium text-slate-600">Auditor: {user?.name || "Unknown"}</span>
-                        <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-sm w-full md:w-auto">
+                        <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Auditor</span>
+                            <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                                    <User className="h-4 w-4" />
+                                </div>
+                                <span className="text-sm font-bold text-slate-900">{user?.name || "Unknown"}</span>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 w-full md:w-auto md:flex md:items-center">
                             <button
                                 onClick={handleCancelAuditClick}
-                                className="rounded-md bg-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-300 cursor-pointer"
-                                title="Cancel Current Audit"
+                                className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-100 transition-colors shadow-sm active:scale-95"
                             >
-                                Cancel
+                                <X className="h-4 w-4" />
+                                <span>Cancel</span>
                             </button>
                             <button
                                 onClick={handleStopAuditClick}
-                                className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700 cursor-pointer"
-                                title="Finish and Save Audit"
+                                className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
                             >
-                                Finish Audit
+                                <CheckCircle className="h-4 w-4" />
+                                <span className="whitespace-nowrap">Finish & Save</span>
                             </button>
                         </div>
                     </div>
@@ -295,37 +329,36 @@ export default function AuditPage() {
 
             {/* Scanner UI Overlay */}
             {isScanning && (
-                <div className="fixed inset-0 z-50 flex flex-col bg-black">
-                    <div className="flex items-center justify-between bg-black p-4 text-white">
+                <div className="fixed inset-0 z-50 flex flex-col bg-black animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between bg-black/80 backdrop-blur-md p-4 text-white z-20">
                         <h3 className="text-lg font-semibold">Scan Asset Tag</h3>
                         <button
                             onClick={handleStopScanning}
-                            className="rounded-full bg-white/20 p-2 text-white hover:bg-white/30 cursor-pointer"
-                            title="Close Scanner"
+                            className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors cursor-pointer"
                         >
                             <X className="h-6 w-6" />
                         </button>
                     </div>
-                    <div className="flex-1 flex items-center justify-center bg-black">
-                        <div id="audit-reader" className="w-full max-w-md overflow-hidden rounded-lg"></div>
+                    <div className="flex-1 flex items-center justify-center bg-black relative">
+                        <div id="audit-reader" className="w-full max-w-md overflow-hidden rounded-xl border-2 border-white/20 shadow-2xl"></div>
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                            <div className="w-64 h-64 border-2 border-white/50 rounded-lg"></div>
+                        </div>
                     </div>
-                    <div className="p-8 text-center text-white/70">
-                        <p>Point camera at an asset tag or QR code</p>
+                    <div className="p-8 text-center text-white/70 bg-black/80 backdrop-blur-md z-20">
+                        <p className="text-sm font-medium">Point camera at an asset tag or QR code</p>
                     </div>
                 </div>
             )}
 
-
-
-            {/* Confirmation Modal */}
             {
                 confirmAction && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                        <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-                            <h2 className="mb-4 text-xl font-bold text-slate-900">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl scale-100 transform transition-all">
+                            <h2 className="mb-2 text-xl font-bold text-slate-900">
                                 {confirmAction === "Finish" ? "Finish Audit?" : "Cancel Audit?"}
                             </h2>
-                            <p className="mb-6 text-slate-600">
+                            <p className="mb-6 text-sm text-slate-600">
                                 {confirmAction === "Finish"
                                     ? "Are you sure you want to finish this audit? This will save the current results to history."
                                     : "Are you sure you want to cancel? All progress will be lost."}
@@ -333,13 +366,13 @@ export default function AuditPage() {
                             <div className="flex justify-end gap-3">
                                 <button
                                     onClick={() => setConfirmAction(null)}
-                                    className="rounded-md border border-slate-300 px-4 py-2 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                    className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                                 >
-                                    No, Go Back
+                                    Go Back
                                 </button>
                                 <button
                                     onClick={confirmActionHandler}
-                                    className={`rounded-md px-4 py-2 text-white cursor-pointer ${confirmAction === "Finish" ? "bg-blue-600 hover:bg-blue-700" : "bg-red-600 hover:bg-red-700"
+                                    className={`rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors cursor-pointer ${confirmAction === "Finish" ? "bg-blue-600 hover:bg-blue-700" : "bg-red-600 hover:bg-red-700"
                                         } `}
                                 >
                                     Yes, {confirmAction}
@@ -352,75 +385,72 @@ export default function AuditPage() {
 
             {
                 auditStatus === "In Progress" && (
-                    <div className="rounded-lg bg-white p-4 shadow-sm md:p-6">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                         <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4 text-center">
-                            <div className="rounded-xl bg-blue-50 p-4 ring-1 ring-blue-100 md:p-6">
-                                <div className="text-2xl font-bold text-blue-700 md:text-3xl">{totalAssets}</div>
-                                <div className="mt-1 text-sm font-bold text-blue-600 md:text-base">Total Assets (In Stock)</div>
+                            <div className="rounded-xl bg-blue-50/50 p-6 ring-1 ring-blue-100">
+                                <div className="text-3xl font-black text-blue-600 tracking-tight">{totalAssets}</div>
+                                <div className="mt-1 text-xs font-bold text-blue-400 uppercase tracking-widest">Total Stock</div>
                             </div>
-                            <div className="rounded-xl bg-green-50 p-4 ring-1 ring-green-100 md:p-6">
-                                <div className="text-2xl font-bold text-green-700 md:text-3xl">{scannedCount}</div>
-                                <div className="mt-1 text-sm font-bold text-green-600 md:text-base">
+                            <div className="rounded-xl bg-emerald-50/50 p-6 ring-1 ring-emerald-100">
+                                <div className="text-3xl font-black text-emerald-600 tracking-tight">{scannedCount}</div>
+                                <div className="mt-1 text-xs font-bold text-emerald-400 uppercase tracking-widest">
                                     Found ({totalAssets > 0 ? Math.round((scannedCount / totalAssets) * 100) : 0}%)
                                 </div>
                             </div>
-                            <div className="rounded-xl bg-red-50 p-4 ring-1 ring-red-100 md:p-6">
-                                <div className="text-2xl font-bold text-red-700 md:text-3xl">{missingCount}</div>
-                                <div className="mt-1 text-sm font-bold text-red-600 md:text-base">
+                            <div className="rounded-xl bg-rose-50/50 p-6 ring-1 ring-rose-100">
+                                <div className="text-3xl font-black text-rose-600 tracking-tight">{missingCount}</div>
+                                <div className="mt-1 text-xs font-bold text-rose-400 uppercase tracking-widest">
                                     Missing ({totalAssets > 0 ? Math.round((missingCount / totalAssets) * 100) : 0}%)
                                 </div>
                             </div>
                         </div>
 
                         <div className="mb-2">
-                            <label className="mb-2 block text-sm font-medium text-slate-700 md:block hidden">
-                                Scan Asset Tag or Serial No.
+                            <label className="mb-2 block text-sm font-bold text-slate-700 hidden md:block">
+                                Quick Scan
                             </label>
 
-                            {/* Desktop View: Input Field + Scanner Gun Support */}
+                            {/* Desktop View */}
                             <div className="hidden md:flex gap-2">
                                 <div className="relative flex-1">
                                     <ScanBarcode className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                                     <input
                                         type="text"
+                                        readOnly={true}
                                         value={currentInput}
-                                        onChange={(e) => setCurrentInput(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter") {
-                                                handleScan(e);
-                                            }
-                                        }}
-                                        className="w-full rounded-md border border-slate-300 bg-white pl-10 pr-4 py-3 text-base text-black focus:border-blue-500 focus:outline-none md:py-2 md:text-sm"
-                                        placeholder="Scan or Type Asset Tag"
+                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-not-allowed"
+                                        placeholder="Scan barcode or type and press Enter..."
                                     />
+                                    {currentInput && (
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                            Last Scanned
+                                        </div>
+                                    )}
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => setIsScanning(true)}
-                                    className="flex items-center justify-center rounded-md bg-slate-100 px-4 text-slate-700 hover:bg-slate-200 cursor-pointer"
-                                    title="Open Camera Scanner"
+                                    className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 text-sm font-bold text-white hover:bg-slate-800 shadow-sm transition-all cursor-pointer"
+                                    title="Open Camera"
                                 >
-                                    <Camera className="h-6 w-6" />
+                                    <Camera className="h-4 w-4" />
+                                    <span>Camera</span>
                                 </button>
                             </div>
 
-                            {/* Mobile View: Large Camera Button Only */}
+                            {/* Mobile View */}
                             <div className="md:hidden">
                                 <button
                                     type="button"
                                     onClick={() => setIsScanning(true)}
-                                    className="group flex w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 py-4 text-white shadow-md active:scale-[0.98] active:shadow-sm transition-all cursor-pointer"
+                                    className="group flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-4 text-white shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer"
                                 >
                                     <div className="rounded-full bg-white/20 p-2 group-hover:bg-white/30 transition-colors">
                                         <Camera className="h-6 w-6" />
                                     </div>
-                                    <span className="text-base font-semibold">Tap to Scan Camera</span>
+                                    <span className="text-lg font-bold">Tap to Scan</span>
                                 </button>
                             </div>
-
-                            <p className="mt-2 text-xs text-slate-500 hidden md:block">
-                                Please use a barcode scanner or the camera button.
-                            </p>
                         </div>
                     </div>
                 )
@@ -428,147 +458,143 @@ export default function AuditPage() {
 
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <div className="rounded-lg bg-white p-4 shadow-sm md:p-6">
-                    <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-green-700">
-                        <CheckCircle className="h-5 w-5" />
-                        Scanned Assets
-                    </h2>
-                    <div className="max-h-96 overflow-y-auto">
-                        {/* Mobile List View */}
-                        <div className="md:hidden space-y-2">
-                            {scannedAssetsList
-                                .map((asset) => (
-                                    <div key={asset.id} className="rounded border border-green-100 bg-green-50 p-3 text-sm">
-                                        <div className="font-bold text-slate-900 truncate">{asset.computerNo}</div>
-                                        <div className="text-xs text-slate-500">S/N : {asset.serialNo}</div>
-                                        <div className="text-xs text-slate-500">{asset.brand} {asset.model}</div>
-                                        <div className="text-xs text-slate-500">{asset.owner || "-"} • {asset.department || "-"}</div>
-                                        <div className="mt-1">
-                                            <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${asset.status === "In Stock" ? "bg-green-100 text-green-800" :
-                                                asset.status === "In Use" ? "bg-blue-100 text-blue-800" :
-                                                    asset.status === "Resign" ? "bg-red-100 text-red-800" :
-                                                        "bg-yellow-100 text-yellow-800"
-                                                } `}>
-                                                {asset.status}
-                                            </span>
-                                        </div>
+                {/* Scanned List */}
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[500px]">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                            </div>
+                            <h2 className="font-bold text-slate-900">Scanned Assets</h2>
+                        </div>
+                        <span className="text-xs font-bold bg-white border border-slate-200 px-2 py-1 rounded-md text-slate-500">
+                            {scannedAssetsList.length} Items
+                        </span>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-0">
+                        {/* Mobile List */}
+                        <div className="md:hidden divide-y divide-slate-100">
+                            {scannedAssetsList.map((asset) => (
+                                <div key={asset.id} className="p-4 bg-white">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <div className="font-bold text-slate-900">{asset.computerNo}</div>
+                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${asset.status === "In Stock" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                                            }`}>
+                                            {asset.status}
+                                        </span>
                                     </div>
-                                ))}
-                            {scannedIds.size === 0 && (
-                                <div className="text-center text-sm text-slate-500 py-4">No assets scanned yet.</div>
+                                    <div className="text-xs text-slate-500 mb-1">{asset.brand} {asset.model}</div>
+                                    <div className="text-xs text-slate-400 font-mono">S/N: {asset.serialNo}</div>
+                                </div>
+                            ))}
+                            {scannedAssetsList.length === 0 && (
+                                <div className="p-8 text-center text-sm text-slate-500 italic">No assets scanned yet.</div>
                             )}
                         </div>
 
-                        {/* Desktop Table View */}
-                        <table className="hidden min-w-full divide-y divide-slate-200 md:table">
-                            <thead className="bg-slate-100 sticky top-0 z-10 shadow-sm">
+                        {/* Desktop Table */}
+                        <table className="hidden min-w-full divide-y divide-slate-100 md:table">
+                            <thead className="bg-slate-50 sticky top-0 z-10">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700">Computer No.</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700">Brand</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700">Owner</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700">Dept</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700">Status</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Asset</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Details</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200">
-                                {scannedAssetsList
-                                    .map((asset) => (
-                                        <tr key={asset.id}>
-                                            <td className="px-4 py-2 text-sm text-slate-900">
-                                                <div className="font-semibold">{asset.computerNo}</div>
-                                                <div className="text-xs text-slate-500">S/N : {asset.serialNo}</div>
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-slate-700">
-                                                <div className="font-medium">{asset.brand || "-"}</div>
-                                                <div className="text-xs text-slate-500">{asset.model || "-"}</div>
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-slate-500">{asset.owner || "-"}</td>
-                                            <td className="px-4 py-2 text-sm text-slate-500">{asset.department || "-"}</td>
-                                            <td className="px-4 py-2 text-sm">
-                                                <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${asset.status === "In Stock" ? "bg-green-100 text-green-800" :
-                                                    asset.status === "In Use" ? "bg-blue-100 text-blue-800" :
-                                                        asset.status === "Resign" ? "bg-red-100 text-red-800" :
-                                                            "bg-yellow-100 text-yellow-800"
-                                                    } `}>
-                                                    {asset.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
+                            <tbody className="divide-y divide-slate-50 bg-white">
+                                {scannedAssetsList.map((asset) => (
+                                    <tr key={asset.id} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="px-6 py-3">
+                                            <div className="font-semibold text-slate-900 text-sm">{asset.computerNo}</div>
+                                            <div className="text-xs text-slate-500 font-mono">{asset.serialNo}</div>
+                                        </td>
+                                        <td className="px-6 py-3">
+                                            <div className="text-sm text-slate-700">{asset.brand} {asset.model}</div>
+                                            <div className="text-xs text-slate-400">{asset.department || "No Dept"}</div>
+                                        </td>
+                                        <td className="px-6 py-3">
+                                            <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-600/10">
+                                                {asset.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {scannedAssetsList.length === 0 && (
+                                    <tr>
+                                        <td colSpan={3} className="px-6 py-12 text-center text-sm text-slate-400 italic">
+                                            Ready to scan...
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <div className="rounded-lg bg-white p-4 shadow-sm md:p-6">
-                    <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-red-700">
-                        <AlertCircle className="h-5 w-5" />
-                        Missing Assets
-                    </h2>
-                    <div className="max-h-96 overflow-y-auto">
-                        {/* Mobile List View */}
-                        <div className="md:hidden space-y-2">
-                            {missingAssetsList
-                                .map((asset) => (
-                                    <div key={asset.id} className="rounded border border-red-100 bg-red-50 p-3 text-sm">
+                {/* Missing List */}
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[500px]">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-rose-100 flex items-center justify-center">
+                                <AlertCircle className="h-4 w-4 text-rose-600" />
+                            </div>
+                            <h2 className="font-bold text-slate-900">Missing Assets</h2>
+                        </div>
+                        <span className="text-xs font-bold bg-white border border-slate-200 px-2 py-1 rounded-md text-slate-500">
+                            {missingAssetsList.length} Items
+                        </span>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-0">
+                        {/* Mobile List */}
+                        <div className="md:hidden divide-y divide-slate-100">
+                            {missingAssetsList.map((asset) => (
+                                <div key={asset.id} className="p-4 bg-white hover:bg-rose-50/30 transition-colors">
+                                    <div className="flex justify-between items-start mb-1">
                                         <div className="font-bold text-slate-900">{asset.computerNo}</div>
-                                        <div className="text-xs text-slate-500">S/N : {asset.serialNo}</div>
-                                        <div className="text-xs text-slate-500">{asset.brand} {asset.model}</div>
-                                        <div className="text-xs text-slate-500">{asset.owner || "-"} • {asset.department || "-"}</div>
-                                        <div className="mt-1">
-                                            <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${asset.status === "In Stock" ? "bg-green-100 text-green-800" :
-                                                asset.status === "In Use" ? "bg-blue-100 text-blue-800" :
-                                                    asset.status === "Resign" ? "bg-red-100 text-red-800" :
-                                                        "bg-yellow-100 text-yellow-800"
-                                                } `}>
-                                                {asset.status}
-                                            </span>
-                                        </div>
+                                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                                            {asset.status}
+                                        </span>
                                     </div>
-                                ))}
+                                    <div className="text-xs text-slate-500 mb-1">{asset.brand} {asset.model}</div>
+                                    <div className="text-xs text-slate-400 font-mono">S/N: {asset.serialNo}</div>
+                                </div>
+                            ))}
                         </div>
 
-                        {/* Desktop Table View */}
-                        <table className="hidden min-w-full divide-y divide-slate-200 md:table">
-                            <thead className="bg-slate-100 sticky top-0 z-10 shadow-sm">
+                        {/* Desktop Table */}
+                        <table className="hidden min-w-full divide-y divide-slate-100 md:table">
+                            <thead className="bg-slate-50 sticky top-0 z-10">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700">Computer No.</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700">Brand</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700">Owner</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700">Dept</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700">Status</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Asset</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Details</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200">
-                                {missingAssetsList
-                                    .map((asset) => (
-                                        <tr key={asset.id}>
-                                            <td className="px-4 py-2 text-sm text-slate-900">
-                                                <div className="font-semibold">{asset.computerNo}</div>
-                                                <div className="text-xs text-slate-500">S/N : {asset.serialNo}</div>
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-slate-700">
-                                                <div className="font-medium">{asset.brand || "-"}</div>
-                                                <div className="text-xs text-slate-500">{asset.model || "-"}</div>
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-slate-500">{asset.owner || "-"}</td>
-                                            <td className="px-4 py-2 text-sm text-slate-500">{asset.department || "-"}</td>
-                                            <td className="px-4 py-2 text-sm">
-                                                <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${asset.status === "In Stock" ? "bg-green-100 text-green-800" :
-                                                    asset.status === "In Use" ? "bg-blue-100 text-blue-800" :
-                                                        asset.status === "Resign" ? "bg-red-100 text-red-800" :
-                                                            "bg-yellow-100 text-yellow-800"
-                                                    } `}>
-                                                    {asset.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
+                            <tbody className="divide-y divide-slate-50 bg-white">
+                                {missingAssetsList.map((asset) => (
+                                    <tr key={asset.id} className="hover:bg-rose-50/10 transition-colors">
+                                        <td className="px-6 py-3">
+                                            <div className="font-semibold text-slate-900 text-sm">{asset.computerNo}</div>
+                                            <div className="text-xs text-slate-500 font-mono">{asset.serialNo}</div>
+                                        </td>
+                                        <td className="px-6 py-3">
+                                            <div className="text-sm text-slate-700">{asset.brand} {asset.model}</div>
+                                            <div className="text-xs text-slate-400">{asset.department || "No Dept"}</div>
+                                        </td>
+                                        <td className="px-6 py-3">
+                                            <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 border border-slate-200">
+                                                Pending
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
-        </div >
+        </motion.div>
     );
 }

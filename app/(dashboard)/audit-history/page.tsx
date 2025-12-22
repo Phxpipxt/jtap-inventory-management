@@ -55,7 +55,7 @@ export default function AuditHistoryPage() {
 
     // Resizable Columns
     const { columnWidths, startResizing } = useResizableColumns({
-        date: "180px",
+        date: "200px", // Increased width for "Date & Time"
         auditor: "150px",
         total: "80px",
         found: "80px",
@@ -294,8 +294,13 @@ export default function AuditHistoryPage() {
                             <div key={log.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                                 <div className="mb-3 flex items-start justify-between">
                                     <div>
-                                        <div className="font-medium text-slate-900">{new Date(log.date).toLocaleString()}</div>
-                                        <div className="text-xs text-slate-500">Auditor: {log.auditedBy || "-"}</div>
+                                        <div className="font-medium text-slate-900">
+                                            {new Date(log.date).toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: '2-digit' })}
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                            {new Date(log.date).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-1">Auditor: {log.auditedBy || "-"}</div>
                                         <div className="mt-2 space-y-1">
                                             <div className="flex items-center gap-1 text-xs">
                                                 <span className="font-medium text-slate-600">Supervisor:</span>
@@ -363,7 +368,7 @@ export default function AuditHistoryPage() {
                         <thead className="bg-slate-100 sticky top-0 z-10 shadow-sm">
                             <tr>
                                 {[
-                                    { id: "date", label: "Date" },
+                                    { id: "date", label: "Date & Time" },
                                     { id: "auditor", label: "Auditor" },
                                     { id: "total", label: "Total" },
                                     { id: "found", label: "Found" },
@@ -399,7 +404,14 @@ export default function AuditHistoryPage() {
                                 filteredLogs.map((log) => (
                                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-900">
-                                            {new Date(log.date).toLocaleString()}
+                                            <div className="flex flex-col">
+                                                <span className="font-semibold text-slate-700">
+                                                    {new Date(log.date).toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: '2-digit' })}
+                                                </span>
+                                                <span className="text-xs text-slate-500 font-mono mt-0.5">
+                                                    {new Date(log.date).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                                                </span>
+                                            </div>
                                         </td>
                                         <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{log.auditedBy || "-"}</td>
                                         <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{log.totalAssets}</td>

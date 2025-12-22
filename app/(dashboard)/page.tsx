@@ -6,6 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recha
 import { Package, CheckCircle, User, History, Clock, FileText, Repeat } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { motion } from "framer-motion";
 
 export default function DashboardPage() {
     const { assets, logs, loading } = useInventory();
@@ -76,7 +77,12 @@ export default function DashboardPage() {
     };
 
     return (
-        <div className="space-y-6">
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6 pb-20 md:pb-0 font-inter"
+        >
             <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
 
             <div className="grid gap-6 md:grid-cols-4">
@@ -172,6 +178,6 @@ export default function DashboardPage() {
                 </div>
 
             </div>
-        </div >
+        </motion.div>
     );
 }

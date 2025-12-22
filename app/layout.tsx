@@ -12,8 +12,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "JTAP | Inventory Asset Managment",
-  description: "Inventory management for JTAP",
+  title: "JTAP IT Asset Control",
+  description: "IT Asset Control System for JTAP",
   icons: {
     icon: "/jtekt_logo_header.png",
   },
@@ -21,9 +21,9 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "https://scalar-andromeda.vercel.app/",
-    title: "JTAP | Inventory Asset Managment",
-    description: "Inventory management for JTAP",
-    siteName: "JTAP Inventory",
+    title: "JTAP IT Asset Control",
+    description: "IT Asset Control System for JTAP",
+    siteName: "JTAP IT Asset Control",
   },
 };
 

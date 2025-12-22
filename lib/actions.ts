@@ -1,23 +1,31 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { Asset, LogEntry, AuditLog } from "@/lib/types"; // Interfaces
+import { Asset, LogEntry, AuditLog, AssetStatus, Department } from "@/lib/types"; // Interfaces
 import { revalidatePath } from "next/cache";
 
 // --- Assets ---
 
 export async function getAssets(): Promise<Asset[]> {
     const assets = await prisma.asset.findMany({
-        include: { images: true },
-        orderBy: { lastUpdated: "desc" }
+        include: {
+            images: true,
+        },
     });
 
-    return assets.map((a: any) => ({
+    return assets.map((a) => ({
         ...a,
-        status: a.status as any,
-        department: a.department as any,
+        status: a.status as AssetStatus,
+        department: a.department as Department | null,
         brand: a.brand || undefined,
-        images: a.images.map((img: any) => img.data),
+        model: a.model || undefined,
+        owner: a.owner || undefined,
+        empId: a.empId || undefined,
+        remarks: a.remarks || undefined,
+        hdd: a.hdd || undefined,
+        ram: a.ram || undefined,
+        cpu: a.cpu || undefined,
+        images: a.images.map((img) => img.data),
         purchaseDate: a.purchaseDate ? a.purchaseDate.toISOString() : undefined,
         warrantyExpiry: a.warrantyExpiry ? a.warrantyExpiry.toISOString() : undefined,
         distributionDate: a.distributionDate ? a.distributionDate.toISOString() : undefined,
@@ -68,6 +76,7 @@ export async function createAsset(asset: Asset, adminUser: string, log?: LogEntr
 
 export async function updateAsset(asset: Asset, adminUser: string) {
     const { images, ...data } = asset;
+    console.log("DEBUG: updateAsset received:", { id: asset.id, cpu: asset.cpu, ram: asset.ram, hdd: asset.hdd });
 
     // We need to handle images carefully: 
     // Simplified strategy: Delete all existing images for this asset and recreate them.
@@ -75,6 +84,7 @@ export async function updateAsset(asset: Asset, adminUser: string) {
 
     await prisma.$transaction(async (tx: any) => {
         // 1. Update clean fields
+        console.log("DEBUG: Prisma update payload:", data);
         await tx.asset.update({
             where: { id: asset.id },
             data: {

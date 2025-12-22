@@ -71,10 +71,10 @@ export interface Asset {
 
 export interface LogEntry {
     id: string;
-    assetId: string;
+    assetId: string | null;
     computerNo: string;
     serialNo: string;
-    action: "Check-in" | "Check-out" | "Add" | "Update" | "Audit" | "Delete" | "Dispose";
+    action: "Check-in" | "Check-out" | "Add" | "Update" | "Audit" | "Delete" | "Dispose" | "Import";
     timestamp: string;
     adminUser: string;
     details?: string;

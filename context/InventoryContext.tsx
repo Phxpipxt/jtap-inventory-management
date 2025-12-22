@@ -19,11 +19,13 @@ interface InventoryContextType {
     logs: LogEntry[];
     auditLogs: AuditLog[];
     loading: boolean;
+    logsLoading: boolean;
+    auditLogsLoading: boolean;
     addAsset: (asset: Asset, adminUser: string) => Promise<void>;
-    addAssets: (newAssetsList: Asset[], adminUser: string) => Promise<void>;
+    addAssets: (newAssetsList: Asset[], adminUser: string, action?: "Add" | "Import") => Promise<void>;
     updateAsset: (updatedAsset: Asset, adminUser: string, action: "Check-in" | "Check-out" | "Update" | "Dispose", details?: string) => Promise<void>;
-    deleteAsset: (assetId: string, adminUser: string) => Promise<void>;
-    deleteAssets: (assetIds: string[], adminUser: string) => Promise<void>;
+    deleteAsset: (assetId: string, adminUser: string, reason?: string) => Promise<void>;
+    deleteAssets: (assetIds: string[], adminUser: string, reason?: string) => Promise<void>;
     saveAuditLog: (log: AuditLog) => Promise<void>;
     verifyAuditLog: (logId: string, verifier: string, step: 1 | 2) => Promise<void>;
 }
@@ -89,7 +91,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
                 action: "Add",
                 timestamp: new Date().toISOString(),
                 adminUser,
-                details: "Initial stock in (Optimistic)",
+                details: "Initial stock in",
             };
 
             queryClient.setQueryData<Asset[]>(["assets"], (old = []) => [asset, ...old]);
@@ -147,7 +149,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
                 action,
                 timestamp: new Date().toISOString(),
                 adminUser,
-                details: logDetail + " (Optimistic)",
+                details: logDetail,
             };
 
             queryClient.setQueryData<Asset[]>(["assets"], (old = []) =>
@@ -168,7 +170,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     });
 
     const deleteAssetMutation = useMutation({
-        mutationFn: async ({ assetId, adminUser }: { assetId: string; adminUser: string }) => {
+        mutationFn: async ({ assetId, adminUser, reason }: { assetId: string; adminUser: string; reason?: string }) => {
             const assetToDelete = assets.find(a => a.id === assetId);
             if (!assetToDelete) return; // Should not happen
 
@@ -180,13 +182,13 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
                 action: "Delete",
                 timestamp: new Date().toISOString(),
                 adminUser,
-                details: "Asset deleted from inventory",
+                details: reason ? `Asset deleted: ${reason}` : "Asset deleted from inventory",
             };
 
             await createLog(log);
             await deleteAssetAction(assetId);
         },
-        onMutate: async ({ assetId, adminUser }) => {
+        onMutate: async ({ assetId, adminUser, reason }) => {
             await queryClient.cancelQueries({ queryKey: ["assets"] });
             await queryClient.cancelQueries({ queryKey: ["logs"] });
 
@@ -204,7 +206,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
                 action: "Delete",
                 timestamp: new Date().toISOString(),
                 adminUser,
-                details: "Asset deleted from inventory (Optimistic)",
+                details: reason ? `Asset deleted: ${reason}` : "Asset deleted from inventory",
             };
 
             queryClient.setQueryData<Asset[]>(["assets"], (old = []) => old.filter(a => a.id !== assetId));
@@ -225,23 +227,24 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     });
 
     const deleteAssetsBatchMutation = useMutation({
-        mutationFn: async ({ assetIds, adminUser }: { assetIds: string[]; adminUser: string }) => {
+        mutationFn: async ({ assetIds, adminUser, reason }: { assetIds: string[]; adminUser: string; reason?: string }) => {
             const assetsToDelete = assets.filter(a => assetIds.includes(a.id));
+            const timestamp = new Date().toISOString();
             const newLogs: LogEntry[] = assetsToDelete.map(asset => ({
                 id: crypto.randomUUID(),
                 assetId: asset.id,
                 computerNo: asset.computerNo,
                 serialNo: asset.serialNo,
                 action: "Delete",
-                timestamp: new Date().toISOString(),
+                timestamp,
                 adminUser,
-                details: "Batch delete",
+                details: reason ? `Batch delete: ${reason}` : "Batch delete",
             }));
 
             await createLogs(newLogs);
             await deleteAssetsAction(assetIds);
         },
-        onMutate: async ({ assetIds, adminUser }) => {
+        onMutate: async ({ assetIds, adminUser, reason }) => {
             await queryClient.cancelQueries({ queryKey: ["assets"] });
             await queryClient.cancelQueries({ queryKey: ["logs"] });
 
@@ -249,16 +252,18 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             const previousLogs = queryClient.getQueryData<LogEntry[]>(["logs"]) || [];
 
             const assetsToDelete = previousAssets.filter(a => assetIds.includes(a.id));
+            if (!assetsToDelete.length) return { previousAssets, previousLogs };
 
+            const timestamp = new Date().toISOString();
             const newLogs: LogEntry[] = assetsToDelete.map(asset => ({
                 id: crypto.randomUUID(),
                 assetId: asset.id,
                 computerNo: asset.computerNo,
                 serialNo: asset.serialNo,
                 action: "Delete",
-                timestamp: new Date().toISOString(),
+                timestamp,
                 adminUser,
-                details: "Batch delete (Optimistic)",
+                details: reason ? `Batch delete: ${reason}` : "Batch delete",
             }));
 
             queryClient.setQueryData<Asset[]>(["assets"], (old = []) => old.filter(a => !assetIds.includes(a.id)));
@@ -273,27 +278,24 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     });
 
     const addAssetsBatchMutation = useMutation({
-        mutationFn: async ({ newAssetsList, adminUser }: { newAssetsList: Asset[]; adminUser: string }) => {
-            // Simplified logic: server handles update/create? 
-            // The original logic did client-side diffing. Replicating that here is tricky in mutationFn...
-            // But we can do it.
-            let updatedAssets = [...assets];
-            const logsToAdd: LogEntry[] = [];
-            const assetsToCreate: Asset[] = [];
-            const assetsToUpdate: Asset[] = [];
+        mutationFn: async ({ newAssetsList, adminUser, action = "Add" }: { newAssetsList: Asset[]; adminUser: string; action?: "Add" | "Import" }) => {
+            // Sequential execution to ensure distinct transactions and log creation
+            // This mirrors the "Manual Add" logic which is known to work reliably.
+
+            let currentAssets = [...assets]; // Local copy to track state during import loop
 
             for (const newAsset of newAssetsList) {
-                const existingIndex = updatedAssets.findIndex(
+                const existingIndex = currentAssets.findIndex(
                     a => a.computerNo === newAsset.computerNo || a.serialNo === newAsset.serialNo
                 );
 
                 if (existingIndex >= 0) {
-                    const existingAsset = updatedAssets[existingIndex];
+                    // UPDATE Existing Asset
+                    const existingAsset = currentAssets[existingIndex];
                     const updatedAsset = { ...newAsset, id: existingAsset.id };
-                    updatedAssets[existingIndex] = updatedAsset;
-                    assetsToUpdate.push(updatedAsset);
+                    currentAssets[existingIndex] = updatedAsset;
 
-                    logsToAdd.push({
+                    const log: LogEntry = {
                         id: crypto.randomUUID(),
                         assetId: existingAsset.id,
                         computerNo: newAsset.computerNo,
@@ -302,30 +304,33 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
                         timestamp: new Date().toISOString(),
                         adminUser,
                         details: "Batch import overwrite",
-                    });
-                } else {
-                    updatedAssets.push(newAsset);
-                    assetsToCreate.push(newAsset);
+                    };
 
-                    logsToAdd.push({
+                    // Execute sequentially
+                    await updateAssetAction(updatedAsset, adminUser);
+                    await createLog(log);
+
+                } else {
+                    // CREATE New Asset
+                    currentAssets.push(newAsset);
+
+                    const log: LogEntry = {
                         id: crypto.randomUUID(),
                         assetId: newAsset.id,
                         computerNo: newAsset.computerNo,
                         serialNo: newAsset.serialNo,
-                        action: "Add",
+                        action: action as any,
                         timestamp: new Date().toISOString(),
                         adminUser,
                         details: "Batch import",
-                    });
+                    };
+
+                    // Pass log to createAssetAction for transactional creation
+                    await createAssetAction(newAsset, adminUser, log);
                 }
             }
-
-            // Execute actions
-            for (const a of assetsToCreate) await createAssetAction(a, adminUser);
-            for (const a of assetsToUpdate) await updateAssetAction(a, adminUser);
-            if (logsToAdd.length > 0) await createLogs(logsToAdd);
         },
-        onMutate: async ({ newAssetsList, adminUser }) => {
+        onMutate: async ({ newAssetsList, adminUser, action }) => {
             await queryClient.cancelQueries({ queryKey: ["assets"] });
             await queryClient.cancelQueries({ queryKey: ["logs"] });
 
@@ -373,20 +378,20 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         await addAssetMutation.mutateAsync({ asset, adminUser });
     };
 
-    const addAssets = async (newAssetsList: Asset[], adminUser: string) => {
-        await addAssetsBatchMutation.mutateAsync({ newAssetsList, adminUser });
+    const addAssets = async (newAssetsList: Asset[], adminUser: string, action: "Add" | "Import" = "Add") => {
+        await addAssetsBatchMutation.mutateAsync({ newAssetsList, adminUser, action });
     };
 
     const updateAsset = async (updatedAsset: Asset, adminUser: string, action: "Check-in" | "Check-out" | "Update" | "Dispose", details?: string) => {
         await updateAssetMutation.mutateAsync({ updatedAsset, adminUser, action, details });
     };
 
-    const deleteAsset = async (assetId: string, adminUser: string) => {
-        await deleteAssetMutation.mutateAsync({ assetId, adminUser });
+    const deleteAsset = async (assetId: string, adminUser: string, reason?: string) => {
+        await deleteAssetMutation.mutateAsync({ assetId, adminUser, reason });
     };
 
-    const deleteAssets = async (assetIds: string[], adminUser: string) => {
-        await deleteAssetsBatchMutation.mutateAsync({ assetIds, adminUser });
+    const deleteAssets = async (assetIds: string[], adminUser: string, reason?: string) => {
+        await deleteAssetsBatchMutation.mutateAsync({ assetIds, adminUser, reason });
     };
 
     const saveAuditLog = async (log: AuditLog) => {
@@ -426,6 +431,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         logs,
         auditLogs,
         loading,
+        logsLoading,
+        auditLogsLoading,
         addAsset,
         addAssets,
         updateAsset,
@@ -433,7 +440,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         deleteAssets,
         saveAuditLog,
         verifyAuditLog
-    }), [assets, logs, auditLogs, loading, addAssetMutation, addAssetsBatchMutation, updateAssetMutation, deleteAssetMutation, saveAuditLogMutation]);
+    }), [assets, logs, auditLogs, loading, logsLoading, auditLogsLoading, addAssetMutation, addAssetsBatchMutation, updateAssetMutation, deleteAssetMutation, saveAuditLogMutation]);
 
     return (
         <InventoryContext.Provider value={value}>

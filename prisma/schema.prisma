@@ -43,9 +43,9 @@ model Image {
 
 model LogEntry {
   id         String   @id
-  assetId    String
+  assetId    String?
   // Relation to Asset
-  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset      Asset?   @relation(fields: [assetId], references: [id], onDelete: SetNull)
   computerNo String
   serialNo   String
   action     String

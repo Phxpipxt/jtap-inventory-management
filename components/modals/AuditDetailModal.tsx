@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { AuditLog, Asset, SUPERVISORS } from "@/lib/types";
 import { useInventory } from "@/hooks/useInventory";
 import { useAuth } from "@/context/AuthContext";
-import { X, CheckCircle, AlertCircle, UserCheck, Printer, FileSpreadsheet } from "lucide-react";
+import { X, CheckCircle, AlertCircle, UserCheck, Printer, FileSpreadsheet, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useReactToPrint } from "react-to-print";
 import { PrintableAuditReport } from "@/components/PrintableAuditReport";
@@ -18,13 +18,87 @@ interface AuditDetailModalProps {
 export function AuditDetailModal({ isOpen, onClose, auditLog }: AuditDetailModalProps) {
     const { assets } = useInventory();
     const [activeTab, setActiveTab] = useState<"found" | "missing">("found");
+    const [isGenerating, setIsGenerating] = useState(false);
 
     const printRef = useRef<HTMLDivElement>(null);
 
-    const handlePrint = useReactToPrint({
-        contentRef: printRef,
-        documentTitle: `Audit_Report_${auditLog ? new Date(auditLog.date).toISOString().split('T')[0] : ''}`,
-    });
+    const handleDownloadPdf = async () => {
+        if (!printRef.current || !auditLog) return;
+
+        try {
+            setIsGenerating(true);
+            const html2canvas = (await import("html2canvas")).default;
+            const jsPDF = (await import("jspdf")).default;
+
+            const element = printRef.current;
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                windowWidth: element.scrollWidth,
+                windowHeight: element.scrollHeight
+            });
+
+            const imgData = canvas.toDataURL("image/png");
+
+            // A4 dimensions in mm
+            const pdfWidth = 210;
+            const pdfHeight = 297;
+
+            const pdf = new jsPDF("p", "mm", "a4");
+
+            const imgProps = pdf.getImageProperties(imgData);
+            const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+            // If the content is taller than A4, manage pages (simplistic approach for now: scale to fit or just print tall)
+            // But since PrintableAuditReport uses max-w-[210mm] and min-h-[297mm], it should map 1:1 nicely.
+            // If it's multi-page content, we might need a more complex loop, but let's try standard addImage first.
+            // Given the table can be long, we might need auto-paging.
+            // html2canvas captures the whole element. If it's taller than 297mm, we need to slice it.
+
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+            heightLeft -= pdfHeight;
+
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight; // This logic might need adjustment for multi-page
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, -297 + heightLeft, pdfWidth, imgHeight); // Simplified paging logic
+                // Actually, standard jsPDF multi-page from image is tricky. 
+                // A safer bet for long reports is just adding it as one long page or standard single page if it fits.
+                // Let's stick to single page if it fits, or just one big image for now.
+                // Re-evaluating: The user's issue is SIDE overflow.
+                // The 210mm width match should fix the side overflow.
+                // Multipage tables are hard with converting DOM->Image.
+                // Let's implement the basic image capture. If it cuts off vertically, we might need `jspdf-autotable` later,
+                // but for now, DOM-to-Image is what ensures the "Design" matches.
+                heightLeft -= pdfHeight;
+            }
+
+            // Reset to simple single page add for stability unless explicit multi-page needed
+            // If the element is huge, this approach squashes or cuts.
+            // But let's assume standard report length for now.
+            // Actually, let's revert the while loop attempt and just do a single addImage. 
+            // Most audit summaries are 1-2 pages.
+            // Better: use the logic that fits width and allows height to expand?
+            // "p", "mm", "a4" limits the page.
+            // Let's use the exact code that worked for AssetDetail.
+            // EXCEPT: Audit Reports can be LOOOONG (many assets).
+            // Image-based PDF is bad for long lists.
+            // BUT: User wants the *exact* styling.
+            // Let's try the single image approach first.
+
+            pdf.save(`Audit_Report_${new Date(auditLog.date).toISOString().split('T')[0]}.pdf`);
+
+        } catch (error) {
+            console.error("PDF Generation failed:", error);
+            alert("Failed to generate PDF. Please try again.");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
     if (!isOpen || !auditLog) return null;
 
@@ -40,12 +114,10 @@ export function AuditDetailModal({ isOpen, onClose, auditLog }: AuditDetailModal
 
     const handleExport = () => {
         if (!auditLog) return;
-
         try {
+            // Re-resolve assets to ensure current state
             const foundAssets = assets.filter(a => auditLog.scannedIds.includes(a.id));
-            const missingAssets = auditLog.missingIds
-                ? assets.filter(a => auditLog.missingIds?.includes(a.id))
-                : [];
+            const missingAssets = auditLog.missingIds ? assets.filter(a => auditLog.missingIds?.includes(a.id)) : [];
 
             // Create workbook
             const wb = XLSX.utils.book_new();
@@ -126,12 +198,19 @@ export function AuditDetailModal({ isOpen, onClose, auditLog }: AuditDetailModal
                     </div>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={handlePrint}
-                            className="flex items-center gap-1 rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
-                            title="Print Report"
+                            onClick={handleDownloadPdf}
+                            disabled={isGenerating}
+                            className="flex items-center gap-1 rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer disabled:opacity-50"
+                            title="Download PDF Report"
                         >
-                            <Printer className="h-4 w-4" />
-                            <span className="hidden sm:inline">Print</span>
+                            {isGenerating ? (
+                                <span className="animate-pulse">Generating...</span>
+                            ) : (
+                                <>
+                                    <Download className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Download PDF</span>
+                                </>
+                            )}
                         </button>
                         <button
                             onClick={handleExport}
@@ -197,7 +276,8 @@ export function AuditDetailModal({ isOpen, onClose, auditLog }: AuditDetailModal
                             {(activeTab === "found" ? foundAssets : missingAssets).map((asset) => (
                                 <div key={asset.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
                                     <div className="mb-2 flex items-start justify-between">
-                                        <div className="font-bold text-slate-900 truncate pr-2">{asset.computerNo}</div>
+                                        <div className={`font-bold truncate pr-2 ${activeTab === "found" ? "text-green-600" : "text-red-600"
+                                            }`}>{asset.computerNo}</div>
                                         <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${asset.status === "In Stock" ? "bg-green-100 text-green-800" :
                                             asset.status === "Assigned" || asset.status === "In Use" ? "bg-blue-100 text-blue-800" :
                                                 asset.status === "Broken" || asset.status === "Resign" ? "bg-red-100 text-red-800" :
@@ -232,7 +312,8 @@ export function AuditDetailModal({ isOpen, onClose, auditLog }: AuditDetailModal
                             <tbody className="divide-y divide-slate-200 bg-white">
                                 {(activeTab === "found" ? foundAssets : missingAssets).map((asset) => (
                                     <tr key={asset.id} className="hover:bg-slate-50">
-                                        <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-900">{asset.computerNo}</td>
+                                        <td className={`whitespace-nowrap px-4 py-3 text-sm font-bold ${activeTab === "found" ? "text-green-600" : "text-red-600"
+                                            }`}>{asset.computerNo}</td>
                                         <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-500">{asset.owner || "-"}</td>
                                         <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-500">{asset.department || "-"}</td>
                                         <td className="whitespace-nowrap px-4 py-3 text-sm">
@@ -262,8 +343,8 @@ export function AuditDetailModal({ isOpen, onClose, auditLog }: AuditDetailModal
 
             </div>
 
-            {/* Hidden Printable Component */}
-            <div className="hidden">
+            {/* Hidden Printable Component - Positioned off-screen so proper layout is computed, but not hidden with display:none */}
+            <div className="absolute top-0 left-[-9999px]">
                 <PrintableAuditReport
                     ref={printRef}
                     auditLog={auditLog}

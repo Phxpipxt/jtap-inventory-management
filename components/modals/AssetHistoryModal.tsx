@@ -81,6 +81,17 @@ export function AssetHistoryModal({ asset, isOpen, onClose }: AssetHistoryModalP
                                                     </div>
                                                 );
                                             })()
+                                        ) : log.action === "Check-in" && log.details?.startsWith("Returned from") ? (
+                                            // Parse "Returned from Name"
+                                            (() => {
+                                                const name = log.details?.replace("Returned from ", "");
+                                                return (
+                                                    <div className="flex flex-col mt-0.5">
+                                                        <span className="text-sm font-bold text-slate-900">{name}</span>
+                                                        <span className="text-xs text-slate-500 font-medium">Returned Asset</span>
+                                                    </div>
+                                                );
+                                            })()
                                         ) : log.details ? (
                                             <span className="text-sm font-medium text-slate-800 mt-1">
                                                 {log.details}

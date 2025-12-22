@@ -80,7 +80,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
                         <div className="flex flex-col items-center justify-center animate-in fade-in duration-300">
                             <div className="relative h-10 w-32 mb-1">
                                 <Image
-                                    src="/jtekt_logo_header_v2.png"
+                                    src="/jtekt_logo.png"
                                     alt="JTEKT Logo"
                                     fill
                                     priority

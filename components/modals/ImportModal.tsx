@@ -1,10 +1,10 @@
 import { useState, useRef } from "react";
 import { Asset, Department, DEPARTMENTS, BRANDS, HDD_OPTIONS, RAM_OPTIONS } from "@/lib/types";
-import { X, Upload, FileSpreadsheet, Info, AlertTriangle, Download } from "lucide-react";
-// import * as XLSX from "xlsx"; // Removed static import
+import { X, Upload, FileSpreadsheet, AlertTriangle, Download, AlertCircle, Save } from "lucide-react";
 import { AlertModal } from "@/components/modals/AlertModal";
 import { useInventory } from "@/hooks/useInventory";
 import { useAuth } from "@/context/AuthContext";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ImportModalProps {
     isOpen: boolean;
@@ -41,8 +41,6 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
     const showAlert = (title: string, message: string, type: "default" | "error" | "success" | "warning" = "default") => {
         setAlertState({ isOpen: true, title, message, type });
     };
-
-    if (!isOpen) return null;
 
     const processFile = (file: File) => {
         if (!user) {
@@ -163,7 +161,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                         return;
                     }
 
-                    addAssets(newAssets, user?.name || "Unknown");
+                    addAssets(newAssets, user?.name || "Unknown", "Import");
                 }
                 setSummary({ total: data.length, success: newAssets.length });
             } catch (error) {
@@ -279,11 +277,9 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
     };
 
     const handleReplace = () => {
-        // Import ALL assets (both conflicts and non-conflicts)
-        // The context's addAssets logic already handles upserting (updating if exists)
         const allAssets = [...nonConflicts, ...conflicts];
         if (user) {
-            addAssets(allAssets, user.name);
+            addAssets(allAssets, user.name, "Import");
             setSummary({ total: allAssets.length, success: allAssets.length });
             setShowConflictResolution(false);
             setConflicts([]);
@@ -292,10 +288,9 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
     };
 
     const handleSkip = () => {
-        // Import ONLY non-conflicting assets
         if (user) {
             if (nonConflicts.length > 0) {
-                addAssets(nonConflicts, user.name);
+                addAssets(nonConflicts, user.name, "Import");
             }
             setSummary({ total: nonConflicts.length + conflicts.length, success: nonConflicts.length });
             setShowConflictResolution(false);
@@ -310,232 +305,260 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
         setConflicts([]);
         setNonConflicts([]);
         setShowConflictResolution(false);
+        setImporting(false);
         onClose();
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={handleClose}>
-            <AlertModal
-                isOpen={alertState.isOpen}
-                onClose={() => setAlertState(prev => ({ ...prev, isOpen: false }))}
-                title={alertState.title}
-                message={alertState.message}
-                type={alertState.type}
-            />
-            <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                <div className="mb-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <h2 className="text-xl font-bold text-slate-800">Import Assets</h2>
-                    </div>
-                    <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                        <X className="h-6 w-6" />
-                    </button>
-                </div>
+        <AnimatePresence>
+            {isOpen && (
+                <>
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 h-[100dvh] w-screen touch-none"
+                        onClick={handleClose}
+                    >
+                        <AlertModal
+                            isOpen={alertState.isOpen}
+                            onClose={() => setAlertState(prev => ({ ...prev, isOpen: false }))}
+                            title={alertState.title}
+                            message={alertState.message}
+                            type={alertState.type}
+                        />
 
-                <div className="mb-4 rounded-md border border-blue-100 bg-blue-50/50 p-4 text-sm animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold text-blue-900 flex items-center gap-2">
-                            <FileSpreadsheet className="h-4 w-4" />
-                            File Format Guide
-                        </h4>
-                        <button
-                            onClick={handleDownloadTemplate}
-                            className="flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-xs font-medium text-blue-700 shadow-sm border border-blue-200 hover:bg-blue-50 transition-all cursor-pointer"
-                            title="Download Excel Template"
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                            className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl max-h-[90dvh] overflow-hidden flex flex-col"
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            <Download className="h-3.5 w-3.5" />
-                            Template
-                        </button>
-                    </div>
-                    <div className="grid gap-6 sm:grid-cols-2">
-                        <div>
-                            <p className="mb-2 font-medium text-slate-700 border-b border-blue-100 pb-1">Required Columns</p>
-                            <ul className="list-disc pl-4 text-slate-600 space-y-1 text-xs">
-                                <li><span className="font-mono font-semibold text-slate-800">Computer No.</span> (Unique ID)</li>
-                                <li><span className="font-mono font-semibold text-slate-800">Serial No.</span> (Unique ID)</li>
-                            </ul>
-                        </div>
-                        <div>
-                            <p className="mb-2 font-medium text-slate-700 border-b border-blue-100 pb-1">Optional Columns</p>
-                            <ul className="list-disc pl-4 text-slate-600 space-y-1 text-xs">
-                                <li>
-                                    <span className="font-semibold text-slate-800">Dropdowns Available:</span>
-                                    <br />
-                                    Brand, Dept, Status
-                                </li>
-                                <li>
-                                    <span className="font-semibold text-slate-800">Text Fields:</span>
-                                    <br />
-                                    Model, Owner, Emp ID, Tags, Remarks, HDD/SSD, RAM, CPU
-                                </li>
-                                <li>
-                                    <span className="font-semibold text-slate-800">Dates:</span>
-                                    <br />
-                                    Purchase Date, Warranty
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div className="mt-4 rounded bg-white p-3 text-xs text-slate-500 border border-blue-100 shadow-sm">
-                        <p className="flex gap-2">
-                            <span>💡</span>
-                            <span>
-                                <span className="font-medium text-slate-700">Tip:</span> Download the template below. It includes <b>dropdown menus</b> for Brand, Department, and Status to help you select valid options.
-                            </span>
-                        </p>
-                    </div>
-                </div>
+                            {/* Loading Overlay */}
+                            {importing && (
+                                <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
+                                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600"></div>
+                                    <p className="mt-4 font-semibold text-slate-700 animate-pulse">Processing Import...</p>
+                                    <p className="text-sm text-slate-500">Please wait while we validate and save.</p>
+                                </div>
+                            )}
 
-                <div className="mb-4">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Person In Charge</label>
-                    <div className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">
-                        {user?.name}
-                    </div>
-                </div>
-
-                {showConflictResolution ? (
-                    <div className="space-y-4 animate-in fade-in duration-300">
-                        <div className="rounded-md bg-amber-50 p-4 border border-amber-200">
-                            <div className="flex gap-3">
-                                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 bg-white border-b border-slate-100 z-10">
                                 <div>
-                                    <h3 className="text-sm font-medium text-amber-800">Duplicate Assets Detected</h3>
-                                    <p className="mt-1 text-sm text-amber-700">
-                                        Found {conflicts.length} asset(s) that already exist in the inventory.
-                                        Do you want to replace them with the new data?
-                                    </p>
+                                    <h2 className="text-lg sm:text-xl font-bold text-slate-900">Import Assets</h2>
+                                    <p className="text-xs sm:text-sm text-slate-500">Bulk add assets using Excel/CSV</p>
                                 </div>
+                                <button
+                                    onClick={handleClose}
+                                    className="rounded-full p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
                             </div>
-                        </div>
 
-                        <div className="max-h-48 overflow-y-auto overflow-x-auto rounded-md border border-slate-200">
-                            <table className="min-w-full divide-y divide-slate-200">
-                                <thead className="bg-slate-50 sticky top-0">
-                                    <tr>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Computer No.</th>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Serial No.</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-slate-200">
-                                    {conflicts.map((asset, idx) => (
-                                        <tr key={idx}>
-                                            <td className="px-4 py-2 text-sm text-slate-900">{asset.computerNo}</td>
-                                            <td className="px-4 py-2 text-sm text-slate-500">{asset.serialNo}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                            {/* Content */}
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-slate-200">
 
-                        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                            <button
-                                onClick={handleClose}
-                                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
-                            >
-                                Cancel Import
-                            </button>
-                            <button
-                                onClick={handleSkip}
-                                className="rounded-md bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 cursor-pointer"
-                            >
-                                Skip Duplicates
-                            </button>
-                            <button
-                                onClick={handleReplace}
-                                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 cursor-pointer"
-                            >
-                                Replace All
-                            </button>
-                        </div>
-                    </div>
-                ) : errors.length > 0 ? (
-                    <div className="space-y-4">
-                        <div className="rounded-md bg-red-50 p-4">
-                            <div className="flex">
-                                <div className="flex-shrink-0">
-                                    <X className="h-5 w-5 text-red-400" aria-hidden="true" />
-                                </div>
-                                <div className="ml-3">
-                                    <h3 className="text-sm font-medium text-red-800">Import Failed</h3>
-                                    <div className="mt-2 text-sm text-red-700">
-                                        <ul role="list" className="list-disc space-y-1 pl-5">
-                                            {errors.slice(0, 10).map((error, index) => (
-                                                <li key={index}>{error}</li>
-                                            ))}
-                                            {errors.length > 10 && (
-                                                <li>...and {errors.length - 10} more errors</li>
-                                            )}
-                                        </ul>
+                                {/* Steps / Guide */}
+                                <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                                            <FileSpreadsheet className="h-4 w-4 text-blue-600" />
+                                            File Format Guide
+                                        </h4>
+                                        <button
+                                            onClick={handleDownloadTemplate}
+                                            className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm border border-slate-200 hover:border-blue-300 hover:text-blue-800 transition-all"
+                                        >
+                                            <Download className="h-3.5 w-3.5" />
+                                            <span className="hidden sm:inline">Download Template</span>
+                                            <span className="sm:hidden">Template</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="grid gap-4 sm:gap-8 md:grid-cols-2">
+                                        <div>
+                                            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Required</p>
+                                            <ul className="space-y-2 text-sm text-slate-600">
+                                                <li className="flex items-start gap-2">
+                                                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
+                                                    <span><b>Computer No.</b> (Unique ID)</span>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
+                                                    <span><b>Serial No.</b> (Unique ID)</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <div>
+                                            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Flexible Data</p>
+                                            <ul className="space-y-2 text-sm text-slate-600">
+                                                <li className="flex items-start gap-2">
+                                                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                                                    <span>Supports <b>Dropdowns</b> (Brand, Dept, Status)</span>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                                                    <span>Auto-formats <b>Dates</b> (Purchase, Warranty)</span>
+                                                </li>
+                                            </ul>
+                                        </div>
                                     </div>
                                 </div>
+
+                                {/* Main Action Area */}
+                                {showConflictResolution ? (
+                                    <div className="space-y-6 animate-in fade-in duration-300">
+                                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                                            <div className="flex gap-3">
+                                                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                                                <div>
+                                                    <h3 className="text-sm font-bold text-amber-900">Duplicate Assets Detected</h3>
+                                                    <p className="mt-1 text-sm text-amber-700">
+                                                        Found <b>{conflicts.length}</b> asset(s) that already exist. How would you like to handle them?
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 shadow-sm">
+                                            <table className="min-w-full divide-y divide-slate-200">
+                                                <thead className="bg-slate-50 sticky top-0">
+                                                    <tr>
+                                                        <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Computer No.</th>
+                                                        <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial No.</th>
+                                                        <th className="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="bg-white divide-y divide-slate-200">
+                                                    {conflicts.map((asset, idx) => (
+                                                        <tr key={idx} className="hover:bg-slate-50/50">
+                                                            <td className="px-4 py-2.5 text-sm font-medium text-slate-900">{asset.computerNo}</td>
+                                                            <td className="px-4 py-2.5 text-sm text-slate-500">{asset.serialNo}</td>
+                                                            <td className="px-4 py-2.5 text-sm text-right text-amber-600 font-medium">Duplicate</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3 pt-2">
+                                            <button
+                                                onClick={handleSkip}
+                                                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm"
+                                            >
+                                                Skip Duplicates ({conflicts.length})
+                                            </button>
+                                            <button
+                                                onClick={handleReplace}
+                                                className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:shadow-blue-500/40 transition-all"
+                                            >
+                                                Replace All
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : errors.length > 0 ? (
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                                        <div className="rounded-xl bg-red-50 p-4 border border-red-100">
+                                            <div className="flex">
+                                                <div className="flex-shrink-0">
+                                                    <X className="h-5 w-5 text-red-500" />
+                                                </div>
+                                                <div className="ml-3">
+                                                    <h3 className="text-sm font-bold text-red-800">Import Failed</h3>
+                                                    <div className="mt-2 text-sm text-red-700">
+                                                        <ul className="list-disc space-y-1 pl-5">
+                                                            {errors.slice(0, 5).map((error, index) => (
+                                                                <li key={index}>{error}</li>
+                                                            ))}
+                                                            {errors.length > 5 && (
+                                                                <li>...and {errors.length - 5} more errors</li>
+                                                            )}
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => setErrors([])}
+                                            className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg hover:bg-slate-800 transition-all"
+                                        >
+                                            Try Again
+                                        </button>
+                                    </div>
+                                ) : !summary ? (
+                                    <div
+                                        className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all duration-300 ${isDragging
+                                            ? "border-blue-500 bg-blue-50/50 scale-[0.99]"
+                                            : "border-slate-300 bg-white hover:border-blue-400 hover:bg-slate-50"
+                                            } h-64`}
+                                        onClick={() => {
+                                            if (!user) {
+                                                showAlert("Authentication Error", "You must be logged in to import assets.", "error");
+                                                return;
+                                            }
+                                            fileInputRef.current?.click();
+                                        }}
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
+                                    >
+                                        <div className="mb-4 rounded-full bg-blue-50 p-4 group-hover:bg-blue-100 transition-colors">
+                                            <Upload className={`h-8 w-8 ${isDragging ? "text-blue-600" : "text-blue-500"}`} />
+                                        </div>
+                                        <p className="text-lg font-semibold text-slate-700 group-hover:text-blue-700 transition-colors">
+                                            {isDragging ? "Drop file now" : "Click to upload"}
+                                        </p>
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            or drag and drop Excel/CSV file here
+                                        </p>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept=".xlsx, .xls, .csv"
+                                            className="hidden"
+                                            onChange={handleFileUpload}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-8 text-center animate-in zoom-in duration-300">
+                                        <div className="mb-4 rounded-full bg-green-100 p-4 shadow-sm">
+                                            <Save className="h-8 w-8 text-green-600" />
+                                        </div>
+                                        <h3 className="text-xl font-bold text-slate-900">Import Successful!</h3>
+                                        <p className="mx-auto mt-2 max-w-xs text-sm text-slate-500">
+                                            Successfully processed <b className="text-slate-900">{summary.success}</b> records.
+                                            Your inventory has been updated.
+                                        </p>
+                                        <button
+                                            onClick={handleClose}
+                                            className="mt-8 w-full max-w-xs rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-[1.02] transition-all"
+                                        >
+                                            Done
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                        <div className="flex justify-end">
-                            <button
-                                onClick={() => setErrors([])}
-                                className="rounded-md bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 cursor-pointer"
-                            >
-                                Try Again
-                            </button>
-                        </div>
-                    </div>
-                ) : !summary ? (
-                    <div className="space-y-4">
-                        <div className="flex justify-end">
-                            {/* Template button moved to header */}
-                        </div>
-                        <div
-                            className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors ${isDragging
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-slate-300 bg-slate-50 hover:bg-slate-100"
-                                }`}
-                            onClick={() => {
-                                if (!user) {
-                                    showAlert("Authentication Error", "You must be logged in to import assets.", "error");
-                                    return;
-                                }
-                                fileInputRef.current?.click();
-                            }}
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
-                        >
-                            <FileSpreadsheet className={`mb-2 h-10 w-10 ${isDragging ? "text-blue-500" : "text-slate-400"}`} />
-                            <p className={`text-sm font-medium ${isDragging ? "text-blue-700" : "text-slate-600"}`}>
-                                {isDragging ? "Drop file here" : "Click to upload or drag & drop"}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                                Required: Computer No., Serial No. <br />
-                                Existing items will be updated.
-                            </p>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".xlsx, .xls, .csv"
-                                className="hidden"
-                                onChange={handleFileUpload}
-                            />
-                        </div>
-                        {importing && <p className="text-center text-sm text-blue-600">Importing...</p>}
-                    </div>
-                ) : (
-                    <div className="space-y-4 text-center">
-                        <div className="rounded-full bg-green-100 p-3 inline-block">
-                            <Upload className="h-6 w-6 text-green-600" />
-                        </div>
-                        <h3 className="text-lg font-medium text-slate-900">Import Complete</h3>
-                        <p className="text-slate-500">
-                            Successfully processed {summary.success} records (including updates).
-                        </p>
-                        <button
-                            onClick={handleClose}
-                            className="w-full rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 cursor-pointer"
-                        >
-                            Done
-                        </button>
-                    </div>
-                )}
-            </div>
-        </div>
+
+                            {/* Footer */}
+                            {!summary && !showConflictResolution && errors.length === 0 && (
+                                <div className="space-y-4 p-4 sm:p-6 border-t border-slate-100 bg-slate-50/50 z-10 shrink-0">
+                                    <div className="flex items-start gap-3 rounded-lg bg-blue-50/80 p-3 text-sm text-blue-800">
+                                        <AlertCircle className="h-5 w-5 shrink-0 text-blue-600" />
+                                        <div>
+                                            <p className="font-medium">Person In Charge: {user?.name}</p>
+                                            <p className="text-xs opacity-80 mt-0.5">This import will be logged under your account.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </motion.div>
+                    </motion.div>
+                </>
+            )}
+        </AnimatePresence>
     );
 }

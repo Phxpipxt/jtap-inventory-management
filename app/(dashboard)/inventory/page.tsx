@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useInventory } from "@/hooks/useInventory";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
+
 import { calculateAssetAge } from "@/lib/utils";
 import { Asset, AssetStatus, Department, BRANDS, PersonInCharge, PERSONS_IN_CHARGE } from "@/lib/types";
-import { Search, Filter, Plus, Download, UserCog, Upload, Pencil, Trash2, X, Box, CheckCircle2, User, AlertTriangle, Wrench, ArrowUpDown, ArrowUp, ArrowDown, History, RotateCcw, ArrowRight } from "lucide-react";
-// import * as XLSX from "xlsx"; // Removed static import
+import { Search, Filter, Plus, Download, UserCog, Upload, Pencil, Trash2, X, Box, CheckCircle2, User, History, RotateCcw, ArrowRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+
 import { AssignmentModal } from "@/components/modals/AssignmentModal";
 import { AddAssetModal } from "@/components/modals/AddAssetModal";
 import { ImportModal } from "@/components/modals/ImportModal";
@@ -19,6 +20,7 @@ import { AssetHistoryModal } from "@/components/modals/AssetHistoryModal";
 import { useAuth } from "@/context/AuthContext";
 import { Eye } from "lucide-react";
 import { DashboardSkeleton } from "@/components/skeletons/AppSkeletons";
+import { motion } from "framer-motion";
 
 function InventoryContent() {
     const { assets, logs, loading, addAsset, updateAsset, deleteAsset, deleteAssets } = useInventory();
@@ -59,6 +61,7 @@ function InventoryContent() {
 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [assetsToDelete, setAssetsToDelete] = useState<Asset[]>([]);
+    const [deleteReason, setDeleteReason] = useState("");
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState<number | "All">(10);
@@ -196,23 +199,74 @@ function InventoryContent() {
     };
 
     // Alert Modal State
-    const [alertState, setAlertState] = useState<{ isOpen: boolean; title: string; message: string | React.ReactNode; type: "default" | "error" | "warning" }>({
+    const [alertState, setAlertState] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string | React.ReactNode;
+        type: "default" | "error" | "warning";
+        showCancel?: boolean;
+        onConfirm?: () => void;
+        confirmText?: string;
+        cancelText?: string;
+    }>({
         isOpen: false,
         title: "",
         message: "",
         type: "default",
+        showCancel: false,
     });
 
     const showAlert = (title: string, message: React.ReactNode, type: "default" | "error" | "warning" = "default") => {
-        setAlertState({ isOpen: true, title, message, type });
+        setAlertState({ isOpen: true, title, message, type, showCancel: false });
+    };
+
+    const showConfirm = (
+        title: string,
+        message: React.ReactNode,
+        onConfirm: () => void,
+        confirmText = "OK",
+        cancelText = "Cancel"
+    ) => {
+        setAlertState({
+            isOpen: true,
+            title,
+            message,
+            type: "warning",
+            showCancel: true,
+            onConfirm,
+            confirmText,
+            cancelText
+        });
     };
 
     const handleBulkDeleteClick = () => {
         const assets = paginatedAssets.filter(a => selectedIds.has(a.id));
 
-        // Check if any selected asset is assigned
         const assignedAssets = assets.filter(a => a.status === "In Use" || a.owner);
+        const deletableAssets = assets.filter(a => a.status !== "In Use" && !a.owner);
+
         if (assignedAssets.length > 0) {
+            // Case 1: Some assigned, some deletable (Mixed)
+            if (deletableAssets.length > 0) {
+                showConfirm(
+                    "Assigned Assets Selected",
+                    <span>
+                        <span className="font-bold text-red-600">{assignedAssets.length}</span> assets are currently assigned and cannot be deleted.
+                        <br />
+                        Do you want to skip them and delete the remaining <span className="font-bold">{deletableAssets.length}</span> assets?
+                    </span>,
+                    () => {
+                        // Proceed with only deletable assets
+                        setAssetsToDelete(deletableAssets);
+                        setIsDeleteModalOpen(true);
+                    },
+                    "Skip & Delete",
+                    "Cancel"
+                );
+                return;
+            }
+
+            // Case 2: All assigned (None deletable)
             const assetList = assignedAssets.map(a => `${a.computerNo} (${a.owner})`).join("\n");
             showAlert(
                 "Cannot Delete Assigned Assets",
@@ -226,6 +280,7 @@ function InventoryContent() {
             return;
         }
 
+        // Case 3: All deletable
         setAssetsToDelete(assets);
         setIsDeleteModalOpen(true);
     };
@@ -237,13 +292,14 @@ function InventoryContent() {
         }
 
         if (assetsToDelete.length === 1) {
-            deleteAsset(assetsToDelete[0].id, user.name);
+            deleteAsset(assetsToDelete[0].id, user.name, deleteReason);
         } else {
-            deleteAssets(assetsToDelete.map(a => a.id), user.name);
+            deleteAssets(assetsToDelete.map(a => a.id), user.name, deleteReason);
             setSelectedIds(new Set());
         }
         setIsDeleteModalOpen(false);
         setAssetsToDelete([]);
+        setDeleteReason("");
     };
 
     const isAllSelected = paginatedAssets.length > 0 && paginatedAssets.every(a => selectedIds.has(a.id));
@@ -340,6 +396,12 @@ function InventoryContent() {
 
     const handleSaveEdit = (updatedAsset: Asset) => {
         updateAsset(updatedAsset, updatedAsset.updatedBy || "admin", "Update", "Asset details updated");
+
+        // Critical Fix: Update the view modal state if it's currently showing this asset
+        if (assetToView && assetToView.id === updatedAsset.id) {
+            setAssetToView(updatedAsset);
+        }
+
         setIsEditModalOpen(false);
         setAssetToEdit(null);
     };
@@ -365,20 +427,32 @@ function InventoryContent() {
 
     // ... (inside the component)
 
+
+
+    // ... existing imports ...
+
+    // ... (inside component) ...
+
     if (loading) return <DashboardSkeleton />;
 
     return (
-        <div className="space-y-6 pb-20 md:pb-0">
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6 pb-20 md:pb-0 font-inter"
+        >
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <h1 className="text-2xl font-bold text-slate-900">Asset Inventory</h1>
+                <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Asset Inventory</h1>
+                    <p className="text-sm text-slate-500 mt-1">Manage and track all company assets.</p>
+                </div>
             </div>
 
             {/* Dashboard Summary */}
-            {/* Dashboard Summary */}
-            {/* Dashboard Summary */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-6">
                 {/* Total Assets - Large Card (Left) */}
-                <div className="group relative flex flex-col justify-between overflow-hidden rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 transition-all hover:shadow-xl lg:col-span-2">
+                <div className="group relative flex flex-col justify-between overflow-hidden rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200 transition-all hover:shadow-xl lg:col-span-2">
                     {/* Decorative Background Accents - Subtle for Light Theme */}
                     <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-slate-50 blur-3xl group-hover:bg-slate-100 transition-colors"></div>
                     <div className="absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-blue-50/50 blur-2xl group-hover:bg-blue-100/50 transition-colors"></div>
@@ -386,11 +460,11 @@ function InventoryContent() {
                     <div className="relative z-10 flex h-full flex-col justify-between">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Total Assets</p>
-                                <h3 className="mt-2 text-6xl font-black tracking-tight text-slate-900">{assets.filter(a => a.status !== "Disposed").length}</h3>
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Assets</p>
+                                <h3 className="mt-2 text-5xl sm:text-6xl font-black tracking-tight text-slate-900">{assets.filter(a => a.status !== "Disposed").length}</h3>
                             </div>
-                            <div className="rounded-2xl bg-slate-50 p-4 transition-colors group-hover:bg-slate-100">
-                                <Box className="h-10 w-10 text-slate-700" />
+                            <div className="rounded-xl bg-slate-50 p-3 transition-colors group-hover:bg-slate-100">
+                                <Box className="h-8 w-8 text-slate-700" />
                             </div>
                         </div>
                         <div className="mt-8 flex items-center gap-3">
@@ -406,75 +480,75 @@ function InventoryContent() {
                 {/* Status Grid (Right) */}
                 <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:col-span-3 lg:grid-rows-2 lg:gap-4">
                     {/* In Stock */}
-                    <div className="group relative flex flex-col justify-between rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition-all hover:-translate-y-1 hover:shadow-lg hover:ring-emerald-100">
+                    <div className="group relative flex flex-col justify-between rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition-all hover:shadow-md hover:ring-emerald-100">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-sm font-bold uppercase tracking-wide text-gray-500">In Stock</p>
-                                <h3 className="mt-2 text-4xl font-extrabold text-slate-900">{assets.filter(a => a.status === "In Stock").length}</h3>
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">In Stock</p>
+                                <h3 className="mt-1 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{assets.filter(a => a.status === "In Stock").length}</h3>
                             </div>
-                            <div className="rounded-2xl bg-emerald-50 p-3 transition-colors group-hover:bg-emerald-100">
-                                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                            <div className="rounded-xl bg-emerald-50 p-2.5 transition-colors group-hover:bg-emerald-100">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                             </div>
                         </div>
-                        <div className="mt-4 flex items-center gap-2">
-                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                        <div className="mt-3 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
                                 Available
                             </span>
                         </div>
                     </div>
 
                     {/* Second-hand */}
-                    <div className="group relative flex flex-col justify-between rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition-all hover:-translate-y-1 hover:shadow-lg hover:ring-orange-100">
+                    <div className="group relative flex flex-col justify-between rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition-all hover:shadow-md hover:ring-orange-100">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-sm font-bold uppercase tracking-wide text-gray-500">Second-hand</p>
-                                <h3 className="mt-2 text-4xl font-extrabold text-slate-900">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">History</p>
+                                <h3 className="mt-1 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                                     {assets.filter(a => logs.some(log => log.assetId === a.id && log.action === "Check-in")).length}
                                 </h3>
                             </div>
-                            <div className="rounded-2xl bg-orange-50 p-3 transition-colors group-hover:bg-orange-100">
-                                <History className="h-6 w-6 text-orange-600" />
+                            <div className="rounded-xl bg-orange-50 p-2.5 transition-colors group-hover:bg-orange-100">
+                                <History className="h-5 w-5 text-orange-600" />
                             </div>
                         </div>
-                        <div className="mt-4 flex items-center gap-2">
-                            <span className="inline-flex items-center rounded-full bg-orange-50 px-2 py-1 text-xs font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20">
-                                With history
+                        <div className="mt-3 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-700 ring-1 ring-inset ring-orange-600/20">
+                                Used
                             </span>
                         </div>
                     </div>
 
                     {/* In Use */}
-                    <div className="group relative flex flex-col justify-between rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition-all hover:-translate-y-1 hover:shadow-lg hover:ring-blue-100">
+                    <div className="group relative flex flex-col justify-between rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition-all hover:shadow-md hover:ring-blue-100">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-sm font-bold uppercase tracking-wide text-gray-500">In Use</p>
-                                <h3 className="mt-2 text-4xl font-extrabold text-slate-900">{assets.filter(a => a.status === "In Use").length}</h3>
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">In Use</p>
+                                <h3 className="mt-1 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{assets.filter(a => a.status === "In Use").length}</h3>
                             </div>
-                            <div className="rounded-2xl bg-blue-50 p-3 transition-colors group-hover:bg-blue-100">
-                                <User className="h-6 w-6 text-blue-600" />
+                            <div className="rounded-xl bg-blue-50 p-2.5 transition-colors group-hover:bg-blue-100">
+                                <User className="h-5 w-5 text-blue-600" />
                             </div>
                         </div>
-                        <div className="mt-4 flex items-center gap-2">
-                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                        <div className="mt-3 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-inset ring-blue-600/20">
                                 Assigned
                             </span>
                         </div>
                     </div>
 
                     {/* Disposed */}
-                    <div className="group relative flex flex-col justify-between rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition-all hover:-translate-y-1 hover:shadow-lg hover:ring-slate-300">
+                    <div className="group relative flex flex-col justify-between rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition-all hover:shadow-md hover:ring-slate-300">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-sm font-bold uppercase tracking-wide text-gray-500">Disposed</p>
-                                <h3 className="mt-2 text-4xl font-extrabold text-slate-900">{assets.filter(a => a.status === "Disposed").length}</h3>
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Disposed</p>
+                                <h3 className="mt-1 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{assets.filter(a => a.status === "Disposed").length}</h3>
                             </div>
-                            <div className="rounded-2xl bg-slate-100 p-3 transition-colors group-hover:bg-slate-200">
-                                <Trash2 className="h-6 w-6 text-slate-500" />
+                            <div className="rounded-xl bg-slate-100 p-2.5 transition-colors group-hover:bg-slate-200">
+                                <Trash2 className="h-5 w-5 text-slate-500" />
                             </div>
                         </div>
-                        <div className="mt-4 flex items-center gap-2">
-                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10">
-                                Archive Items
+                        <div className="mt-3 flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 ring-1 ring-inset ring-slate-500/10">
+                                Archive
                             </span>
                         </div>
                     </div>
@@ -482,28 +556,29 @@ function InventoryContent() {
             </div>
 
 
-
-
-            <div className="flex flex-col gap-3 rounded-lg bg-white p-4 shadow-md border border-slate-100 md:flex-row md:gap-4">
+            {/* Filters & Search */}
+            <div className="flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-sm border border-slate-200 md:flex-row md:items-center md:gap-4 transition-all hover:shadow-md">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Search..."
+                        placeholder="Search assets..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full rounded-md border border-slate-300 pl-10 pr-4 py-2 text-black placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                     />
                 </div>
-                <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto md:gap-4">
-                    <div className="relative col-span-1 min-w-0 md:w-64">
-                        <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:w-auto md:flex md:gap-3">
+                    <div className="relative col-span-1 min-w-0 md:w-48">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <Filter className="h-3.5 w-3.5 text-slate-400" />
+                        </div>
                         <select
                             value={departmentFilter}
                             onChange={(e) => setDepartmentFilter(e.target.value as Department | "All")}
-                            className="w-full min-w-0 appearance-none rounded-md border border-slate-300 bg-white pl-10 pr-8 py-2 text-black focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-8 py-2.5 text-sm font-medium text-slate-700 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer"
                         >
-                            <option value="All">All Departments</option>
+                            <option value="All">All Depts</option>
                             <option value="Board of Directors">Board of Directors</option>
                             <option value="BP">BP</option>
                             <option value="CU">CU</option>
@@ -519,13 +594,18 @@ function InventoryContent() {
                             <option value="SA">SA</option>
                             <option value="TC">TC</option>
                         </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <ArrowUpDown className="h-3 w-3 text-slate-400 opacity-50" />
+                        </div>
                     </div>
-                    <div className="relative col-span-1 min-w-0 md:w-64">
-                        <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <div className="relative col-span-1 min-w-0 md:w-40">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <Filter className="h-3.5 w-3.5 text-slate-400" />
+                        </div>
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value as AssetStatus | "All")}
-                            className="w-full min-w-0 appearance-none rounded-md border border-slate-300 bg-white pl-10 pr-8 py-2 text-black focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-8 py-2.5 text-sm font-medium text-slate-700 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer"
                         >
                             <option value="All">All Status</option>
                             <option value="In Stock">In Stock</option>
@@ -534,18 +614,26 @@ function InventoryContent() {
                             <option value="Missing">Missing</option>
                             <option value="Broken">Broken</option>
                         </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <ArrowUpDown className="h-3 w-3 text-slate-400 opacity-50" />
+                        </div>
                     </div>
-                    <div className="relative col-span-1 min-w-0 md:w-64">
-                        <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <div className="relative col-span-1 min-w-0 md:w-40">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <Filter className="h-3.5 w-3.5 text-slate-400" />
+                        </div>
                         <select
                             value={lifecycleFilter}
                             onChange={(e) => setLifecycleFilter(e.target.value as "More than 5 Years" | "Less than 5 Years" | "All")}
-                            className="w-full min-w-0 appearance-none rounded-md border border-slate-300 bg-white pl-10 pr-8 py-2 text-black focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-8 py-2.5 text-sm font-medium text-slate-700 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer"
                         >
-                            <option value="All">All Lifecycles</option>
-                            <option value="More than 5 Years">More than 5 Years</option>
-                            <option value="Less than 5 Years">Less than 5 Years</option>
+                            <option value="All">All Ages</option>
+                            <option value="More than 5 Years">&gt; 5 Years</option>
+                            <option value="Less than 5 Years">&lt; 5 Years</option>
                         </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <ArrowUpDown className="h-3 w-3 text-slate-400 opacity-50" />
+                        </div>
                     </div>
                 </div>
                 {(searchTerm || departmentFilter !== "All" || statusFilter !== "All" || lifecycleFilter !== "All") && (
@@ -556,10 +644,10 @@ function InventoryContent() {
                             setStatusFilter("All");
                             setLifecycleFilter("All");
                         }}
-                        className="flex items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm whitespace-nowrap cursor-pointer"
+                        className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-red-500 transition-colors shadow-sm whitespace-nowrap cursor-pointer md:w-auto"
                     >
                         <X className="h-4 w-4" />
-                        Clear
+                        <span className="hidden md:inline">Clear</span>
                     </button>
                 )}
             </div>
@@ -586,12 +674,12 @@ function InventoryContent() {
                 </button>
                 <button
                     onClick={() => setIsAddModalOpen(true)}
-                    className="flex flex-col items-center justify-center gap-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-blue-700 shadow-sm hover:bg-blue-100 active:bg-blue-200 cursor-pointer"
+                    className="flex flex-col items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 p-3 text-white shadow-lg shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
                 >
-                    <div className="rounded-full bg-blue-200 p-2">
-                        <Plus className="h-5 w-5 text-blue-700" />
+                    <div className="rounded-full bg-white/20 p-2">
+                        <Plus className="h-5 w-5 text-white" />
                     </div>
-                    <span className="text-xs font-medium">Add Asset</span>
+                    <span className="text-xs font-bold">Add Asset</span>
                 </button>
             </div>
 
@@ -676,397 +764,364 @@ function InventoryContent() {
                                 Disposed
                             </button>
                         </div>
-                        <div className="mx-2 h-6 w-px bg-slate-200"></div>
-                        <button
-                            onClick={() => setIsImportModalOpen(true)}
-                            className="flex items-center justify-center gap-2 rounded-md bg-slate-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 shadow-sm md:text-sm cursor-pointer"
-                            title="Import"
-                        >
-                            <Download className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                            <span className="hidden sm:inline">Import</span>
-                        </button>
-                        <button
-                            onClick={handleExport}
-                            className="flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 shadow-sm md:text-sm cursor-pointer"
-                            title="Export"
-                        >
-                            <Upload className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                            <span className="hidden sm:inline">Export</span>
-                        </button>
-                        <button
-                            onClick={() => setIsAddModalOpen(true)}
-                            className="flex items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 shadow-sm md:text-sm cursor-pointer"
-                            title="Add Asset"
-                        >
-                            <Plus className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                            <span className="hidden sm:inline">Add Asset</span>
-                        </button>
+                        <div className="flex w-full items-center gap-2 sm:w-auto">
+                            <button
+                                onClick={() => setIsImportModalOpen(true)}
+                                className="group flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm sm:flex-none"
+                            >
+                                <Download className="h-4 w-4" />
+                                <span>Import</span>
+                            </button>
+                            <button
+                                onClick={handleExport}
+                                className="group flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm sm:flex-none"
+                            >
+                                <Upload className="h-4 w-4" />
+                                <span>Export</span>
+                            </button>
+                            <button
+                                onClick={() => setIsAddModalOpen(true)}
+                                className="group flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition-all hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] sm:flex-none"
+                            >
+                                <Plus className="h-4 w-4 transition-transform group-hover:rotate-90" />
+                                <span className="whitespace-nowrap">Add Asset</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Mobile Card View */}
-            <div className="grid gap-4 md:hidden">
-                {paginatedAssets.length > 0 && (
-                    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 shadow-sm">
-                        <input
-                            type="checkbox"
-                            className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                            checked={isAllSelected}
-                            onChange={handleSelectAll}
-                        />
-                        <span className="text-sm font-medium text-slate-700">Select All</span>
-                    </div>
-                )}
-                {paginatedAssets.length === 0 ? (
-                    <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-                        No assets found.
-                    </div>
-                ) : (
-                    paginatedAssets.map((asset) => (
-                        <div
-                            key={asset.id}
-                            className={`rounded-lg border bg-white p-4 shadow-sm transition-colors ${selectedIds.has(asset.id) ? "border-blue-300 bg-blue-50" : "border-slate-200"}`}
-                        >
-                            <div className="mb-3 flex items-start justify-between">
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="checkbox"
-                                        className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                        checked={selectedIds.has(asset.id)}
-                                        onChange={() => handleSelectRow(asset.id)}
-                                    />
-                                    <div className="min-w-0 flex-1">
-                                        <div className="font-bold text-slate-900 truncate">{asset.computerNo}</div>
-                                        <div className="text-xs text-slate-500">S/N : {asset.serialNo}</div>
-                                        <div className="text-xs text-slate-500">{asset.brand} {asset.model}</div>
+                {/* Mobile Card View */}
+                <div className="grid gap-4 md:hidden">
+                    {paginatedAssets.length > 0 && (
+                        <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 shadow-sm">
+                            <input
+                                type="checkbox"
+                                className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                checked={isAllSelected}
+                                onChange={handleSelectAll}
+                            />
+                            <span className="text-sm font-medium text-slate-700">Select All</span>
+                        </div>
+                    )}
+                    {paginatedAssets.length === 0 ? (
+                        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                            No assets found.
+                        </div>
+                    ) : (
+                        paginatedAssets.map((asset) => (
+                            <div
+                                key={asset.id}
+                                className={`rounded-lg border bg-white p-4 shadow-sm transition-colors ${selectedIds.has(asset.id) ? "border-blue-300 bg-blue-50" : "border-slate-200"}`}
+                            >
+                                <div className="mb-3 flex items-start justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="checkbox"
+                                            className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            checked={selectedIds.has(asset.id)}
+                                            onChange={() => handleSelectRow(asset.id)}
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                            <div className="font-bold text-slate-900 truncate">{asset.computerNo}</div>
+                                            <div className="text-xs text-slate-500">S/N : {asset.serialNo}</div>
+                                            <div className="text-xs text-slate-500">{asset.brand} {asset.model}</div>
+                                        </div>
+                                    </div>
+                                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold leading-5 ${asset.status === "In Stock" ? "bg-green-100 text-green-800 border border-green-200" :
+                                        asset.status === "In Use" ? "bg-blue-100 text-blue-800 border border-blue-200" :
+                                            "bg-orange-100 text-orange-800 border border-orange-200"
+                                        }`}>
+                                        {asset.status}
+                                    </span>
+                                </div>
+
+                                <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
+                                    <div>
+                                        <span className="block text-xs text-slate-500">Owner</span>
+                                        <span className="font-medium text-slate-700">{asset.owner || "-"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs text-slate-500">Department</span>
+                                        <span className="font-medium text-slate-700">{asset.department || "-"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs text-slate-500">Age</span>
+                                        {(() => {
+                                            const { years, text } = calculateAssetAge(asset.purchaseDate);
+                                            if (years >= 5) {
+                                                return (
+                                                    <span className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-red-800">
+                                                        {text}
+                                                    </span>
+                                                );
+                                            } else if (years >= 4) {
+                                                return (
+                                                    <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-amber-800">
+                                                        {text}
+                                                    </span>
+                                                );
+                                            } else {
+                                                return (
+                                                    <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-slate-800">
+                                                        {text}
+                                                    </span>
+                                                );
+                                            }
+                                        })()}
                                     </div>
                                 </div>
-                                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold leading-5 ${asset.status === "In Stock" ? "bg-green-100 text-green-800 border border-green-200" :
-                                    asset.status === "In Use" ? "bg-blue-100 text-blue-800 border border-blue-200" :
-                                        "bg-orange-100 text-orange-800 border border-orange-200"
-                                    }`}>
-                                    {asset.status}
-                                </span>
-                            </div>
 
-                            <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
-                                <div>
-                                    <span className="block text-xs text-slate-500">Owner</span>
-                                    <span className="font-medium text-slate-700">{asset.owner || "-"}</span>
-                                </div>
-                                <div>
-                                    <span className="block text-xs text-slate-500">Department</span>
-                                    <span className="font-medium text-slate-700">{asset.department || "-"}</span>
-                                </div>
-                                <div>
-                                    <span className="block text-xs text-slate-500">Age</span>
-                                    {(() => {
-                                        const { years, text } = calculateAssetAge(asset.purchaseDate);
-                                        if (years >= 5) {
-                                            return (
-                                                <span className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-red-800">
-                                                    {text}
-                                                </span>
-                                            );
-                                        } else if (years >= 4) {
-                                            return (
-                                                <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-amber-800">
-                                                    {text}
-                                                </span>
-                                            );
-                                        } else {
-                                            return (
-                                                <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-slate-800">
-                                                    {text}
-                                                </span>
-                                            );
-                                        }
-                                    })()}
-                                </div>
-                            </div>
-
-                            {
-                                asset.remarks && (
-                                    <div className="mb-3 rounded bg-slate-50 p-2 text-xs text-slate-600">
-                                        <span className="font-semibold text-slate-700">Remarks:</span> {asset.remarks}
-                                    </div>
-                                )
-                            }
-
-                            < div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3" >
-                                <button
-                                    onClick={() => {
-                                        setAssetToView(asset);
-                                        setIsViewModalOpen(true);
-                                    }}
-                                    className="flex flex-1 items-center justify-center gap-1 rounded bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 border border-slate-200 cursor-pointer"
-                                >
-                                    <Eye className="h-3.5 w-3.5" />
-                                    Details
-                                </button>
                                 {
-                                    asset.status === "In Use" || asset.owner ? (
-                                        <button
-                                            onClick={() => handleAssignClick(asset)}
-                                            className="flex flex-1 items-center justify-center gap-1 rounded bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100 cursor-pointer"
-                                        >
-                                            <UserCog className="h-3.5 w-3.5" />
-                                            Return
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={() => handleAssignClick(asset)}
-                                            className="flex flex-1 items-center justify-center gap-1 rounded bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 cursor-pointer"
-                                        >
-                                            <UserCog className="h-3.5 w-3.5" />
-                                            Assign
-                                        </button>
+                                    asset.remarks && (
+                                        <div className="mb-3 rounded bg-slate-50 p-2 text-xs text-slate-600">
+                                            <span className="font-semibold text-slate-700">Remarks:</span> {asset.remarks}
+                                        </div>
                                     )
                                 }
-                                < button
-                                    onClick={() => {
-                                        setAssetToHistory(asset);
-                                        setIsHistoryModalOpen(true);
-                                    }}
-                                    className="flex flex-1 items-center justify-center gap-1 rounded bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 cursor-pointer"
-                                >
-                                    <History className="h-3.5 w-3.5" />
-                                    History
-                                </button>
-                                <button
-                                    onClick={() => handleEditClick(asset)}
-                                    className="flex flex-1 items-center justify-center gap-1 rounded bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 cursor-pointer"
-                                >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                    Edit
-                                </button>
-                                <button
-                                    onClick={() => handleDeleteClick(asset)}
-                                    className="flex items-center justify-center rounded bg-red-50 px-3 py-1.5 text-red-700 hover:bg-red-100 cursor-pointer"
-                                    title="Delete Asset"
-                                >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
-                        </div >
-                    ))
-                )
-                }
-            </div >
 
-            {/* Desktop Table View */}
-            < div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md md:block" >
-                <div className="max-h-[600px] overflow-y-auto">
-                    <table className="min-w-full divide-y divide-slate-200 table-fixed">
-                        <thead className="bg-slate-100 sticky top-0 z-10 shadow-sm">
-                            <tr>
-                                <th className="relative px-6 py-3 text-left" style={{ width: columnWidths.checkbox }}>
-                                    <input
-                                        type="checkbox"
-                                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                        checked={isAllSelected}
-                                        onChange={handleSelectAll}
-                                    />
-                                </th>
-                                {[
-                                    { id: "computerNo", label: "Computer No." },
-                                    { id: "brand", label: "Brand" },
-                                    { id: "owner", label: "Owner" },
-                                    { id: "dept", label: "Dept" },
-                                    { id: "status", label: "Status" },
-                                    { id: "age", label: "Age" },
-                                ].map((col) => (
-                                    <th
-                                        key={col.id}
-                                        className="relative px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700 select-none group overflow-hidden text-ellipsis whitespace-nowrap cursor-pointer hover:bg-slate-200 transition-colors"
-                                        style={{ width: columnWidths[col.id] }}
-                                        onClick={() => handleSort(col.id as any)}
+                                <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                                    <button
+                                        onClick={() => {
+                                            setAssetToView(asset);
+                                            setIsViewModalOpen(true);
+                                        }}
+                                        className="flex flex-1 items-center justify-center gap-1 rounded bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 border border-slate-200 cursor-pointer"
                                     >
-                                        <div className="flex items-center gap-1">
-                                            {col.label}
-                                            {sortConfig.key === col.id ? (
-                                                sortConfig.direction === "asc" ? (
-                                                    <ArrowUp className="h-3 w-3 text-blue-600" />
-                                                ) : (
-                                                    <ArrowDown className="h-3 w-3 text-blue-600" />
-                                                )
-                                            ) : (
-                                                <ArrowUpDown className="h-3 w-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            )}
-                                        </div>
-                                        <div
-                                            className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-blue-400/20 group-hover:bg-slate-300/50 z-20"
-                                            onMouseDown={(e) => {
-                                                e.stopPropagation(); // Prevent sort when resizing
-                                                startResizing(e, col.id);
-                                            }}
-                                        >
-                                            <div className="absolute right-0 top-0 h-full w-[1px] bg-slate-200 group-hover:bg-blue-400" />
-                                        </div>
-                                    </th>
-                                ))}
-                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-700" style={{ width: columnWidths.actions }}>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 bg-white">
-                            {paginatedAssets.length === 0 ? (
+                                        <Eye className="h-3.5 w-3.5" />
+                                        Details
+                                    </button>
+                                    {
+                                        asset.status === "In Use" || asset.owner ? (
+                                            <button
+                                                onClick={() => handleAssignClick(asset)}
+                                                className="flex flex-1 items-center justify-center gap-1 rounded bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100 cursor-pointer"
+                                            >
+                                                <UserCog className="h-3.5 w-3.5" />
+                                                Return
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleAssignClick(asset)}
+                                                className="flex flex-1 items-center justify-center gap-1 rounded bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 cursor-pointer"
+                                            >
+                                                <UserCog className="h-3.5 w-3.5" />
+                                                Assign
+                                            </button>
+                                        )
+                                    }
+
+                                    <button
+                                        onClick={() => handleDeleteClick(asset)}
+                                        className="flex items-center justify-center rounded bg-red-50 px-3 py-1.5 text-red-700 hover:bg-red-100 cursor-pointer"
+                                        title="Delete Asset"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )
+                    }
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md md:block">
+                    <div className="max-h-[600px] overflow-y-auto">
+                        <table className="min-w-full divide-y divide-slate-200 table-fixed">
+                            <thead className="bg-slate-100 sticky top-0 z-10 shadow-sm">
                                 <tr>
-                                    <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">
-                                        No assets found matching your criteria.
-                                    </td>
-                                </tr>
-                            ) : (
-                                paginatedAssets.map((asset) => (
-                                    <tr key={asset.id} className={`hover:bg-blue-50 transition-colors ${selectedIds.has(asset.id) ? "bg-blue-50" : ""}`}>
-                                        <td className="px-6 py-4">
-                                            <input
-                                                type="checkbox"
-                                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                                checked={selectedIds.has(asset.id)}
-                                                onChange={() => handleSelectRow(asset.id)}
-                                            />
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-900">
-                                            <div className="font-semibold">{asset.computerNo}</div>
-                                            <div className="text-xs text-slate-500">S/N : {asset.serialNo}</div>
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-700">
-                                            <div className="font-medium">{asset.brand || "-"}</div>
-                                            <div className="text-xs text-slate-500">{asset.model || "-"}</div>
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-700">
-                                            <div className="font-medium">{asset.owner || "-"}</div>
-                                            {asset.empId && <div className="text-xs text-slate-500">{asset.empId}</div>}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-700">{asset.department || "-"}</td>
-                                        <td className="whitespace-nowrap px-6 py-4">
-                                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold leading-5 ${asset.status === "In Stock" ? "bg-green-100 text-green-800 border border-green-200" :
-                                                asset.status === "In Use" ? "bg-blue-100 text-blue-800 border border-blue-200" :
-                                                    "bg-orange-100 text-orange-800 border border-orange-200"
-                                                }`}>
-                                                {asset.status}
-                                            </span>
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm">
-                                            {(() => {
-                                                const { years, text } = calculateAssetAge(asset.purchaseDate);
-                                                if (years >= 5) {
-                                                    return (
-                                                        <span className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-red-800">
-                                                            {text}
-                                                        </span>
-                                                    );
-                                                } else if (years >= 4) {
-                                                    return (
-                                                        <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-amber-800">
-                                                            {text}
-                                                        </span>
-                                                    );
-                                                } else {
-                                                    return (
-                                                        <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-slate-800">
-                                                            {text}
-                                                        </span>
-                                                    );
-                                                }
-                                            })()}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => {
-                                                        setAssetToView(asset);
-                                                        setIsViewModalOpen(true);
-                                                    }}
-                                                    className="rounded p-1 text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
-                                                    title="View Asset Details"
-                                                >
-                                                    <Eye className="h-4 w-4" />
-                                                </button>
-                                                {asset.status === "In Use" || asset.owner ? (
-                                                    <button
-                                                        onClick={() => handleAssignClick(asset)}
-                                                        className="rounded p-1 text-orange-600 hover:bg-orange-100 hover:text-orange-800 transition-colors cursor-pointer"
-                                                        title="Return Asset to Stock"
-                                                    >
-                                                        <UserCog className="h-4 w-4" />
-                                                    </button>
+                                    <th className="relative px-6 py-3 text-left" style={{ width: columnWidths.checkbox }}>
+                                        <input
+                                            type="checkbox"
+                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            checked={isAllSelected}
+                                            onChange={handleSelectAll}
+                                        />
+                                    </th>
+                                    {[
+                                        { id: "computerNo", label: "Computer No." },
+                                        { id: "brand", label: "Brand" },
+                                        { id: "owner", label: "Owner" },
+                                        { id: "dept", label: "Dept" },
+                                        { id: "status", label: "Status" },
+                                        { id: "age", label: "Age" },
+                                    ].map((col) => (
+                                        <th
+                                            key={col.id}
+                                            className="relative px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700 select-none group overflow-hidden text-ellipsis whitespace-nowrap cursor-pointer hover:bg-slate-200 transition-colors"
+                                            style={{ width: columnWidths[col.id] }}
+                                            onClick={() => handleSort(col.id as any)}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                {col.label}
+                                                {sortConfig.key === col.id ? (
+                                                    sortConfig.direction === "asc" ? (
+                                                        <ArrowUp className="h-3 w-3 text-blue-600" />
+                                                    ) : (
+                                                        <ArrowDown className="h-3 w-3 text-blue-600" />
+                                                    )
                                                 ) : (
-                                                    <button
-                                                        onClick={() => handleAssignClick(asset)}
-                                                        className="rounded p-1 text-blue-600 hover:bg-blue-100 hover:text-blue-800 transition-colors cursor-pointer"
-                                                        title="Assign Asset"
-                                                    >
-                                                        <UserCog className="h-4 w-4" />
-                                                    </button>
+                                                    <ArrowUpDown className="h-3 w-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                                                 )}
-                                                <button
-                                                    onClick={() => {
-                                                        setAssetToHistory(asset);
-                                                        setIsHistoryModalOpen(true);
-                                                    }}
-                                                    className="rounded p-1 text-purple-600 hover:bg-purple-100 hover:text-purple-800 transition-colors cursor-pointer"
-                                                    title="View Usage History"
-                                                >
-                                                    <History className="h-4 w-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleEditClick(asset)}
-                                                    className="rounded p-1 text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
-                                                    title="Edit Asset Details"
-                                                >
-                                                    <Pencil className="h-4 w-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteClick(asset)}
-                                                    className="rounded p-1 text-red-600 hover:bg-red-100 hover:text-red-800 transition-colors cursor-pointer"
-                                                    title="Delete Asset"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
                                             </div>
+                                            <div
+                                                className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-blue-400/20 group-hover:bg-slate-300/50 z-20"
+                                                onMouseDown={(e) => {
+                                                    e.stopPropagation(); // Prevent sort when resizing
+                                                    startResizing(e, col.id);
+                                                }}
+                                            >
+                                                <div className="absolute right-0 top-0 h-full w-[1px] bg-slate-200 group-hover:bg-blue-400" />
+                                            </div>
+                                        </th>
+                                    ))}
+                                    <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-700" style={{ width: columnWidths.actions }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 bg-white">
+                                {paginatedAssets.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-500">
+                                            No assets found matching your criteria.
                                         </td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div >
-            </div >
+                                ) : (
+                                    paginatedAssets.map((asset) => (
+                                        <tr key={asset.id} className={`hover:bg-blue-50 transition-colors ${selectedIds.has(asset.id) ? "bg-blue-50" : ""}`}>
+                                            <td className="px-6 py-4">
+                                                <input
+                                                    type="checkbox"
+                                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                    checked={selectedIds.has(asset.id)}
+                                                    onChange={() => handleSelectRow(asset.id)}
+                                                />
+                                            </td>
+                                            <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-900">
+                                                <div className="font-semibold">{asset.computerNo}</div>
+                                                <div className="text-xs text-slate-500">S/N : {asset.serialNo}</div>
+                                            </td>
+                                            <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-700">
+                                                <div className="font-medium">{asset.brand || "-"}</div>
+                                                <div className="text-xs text-slate-500">{asset.model || "-"}</div>
+                                            </td>
+                                            <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-700">
+                                                <div className="font-medium">{asset.owner || "-"}</div>
+                                                {asset.empId && <div className="text-xs text-slate-500">{asset.empId}</div>}
+                                            </td>
+                                            <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-700">{asset.department || "-"}</td>
+                                            <td className="whitespace-nowrap px-6 py-4">
+                                                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold leading-5 ${asset.status === "In Stock" ? "bg-green-100 text-green-800 border border-green-200" :
+                                                    asset.status === "In Use" ? "bg-blue-100 text-blue-800 border border-blue-200" :
+                                                        "bg-orange-100 text-orange-800 border border-orange-200"
+                                                    }`}>
+                                                    {asset.status}
+                                                </span>
+                                            </td>
+                                            <td className="whitespace-nowrap px-6 py-4 text-sm">
+                                                {(() => {
+                                                    const { years, text } = calculateAssetAge(asset.purchaseDate);
+                                                    if (years >= 5) {
+                                                        return (
+                                                            <span className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-red-800">
+                                                                {text}
+                                                            </span>
+                                                        );
+                                                    } else if (years >= 4) {
+                                                        return (
+                                                            <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-amber-800">
+                                                                {text}
+                                                            </span>
+                                                        );
+                                                    } else {
+                                                        return (
+                                                            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold leading-5 text-slate-800">
+                                                                {text}
+                                                            </span>
+                                                        );
+                                                    }
+                                                })()}
+                                            </td>
+                                            <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setAssetToView(asset);
+                                                            setIsViewModalOpen(true);
+                                                        }}
+                                                        className="rounded p-1 text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
+                                                        title="View Asset Details"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </button>
+                                                    {asset.status === "In Use" || asset.owner ? (
+                                                        <button
+                                                            onClick={() => handleAssignClick(asset)}
+                                                            className="rounded p-1 text-orange-600 hover:bg-orange-100 hover:text-orange-800 transition-colors cursor-pointer"
+                                                            title="Return Asset to Stock"
+                                                        >
+                                                            <UserCog className="h-4 w-4" />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleAssignClick(asset)}
+                                                            className="rounded p-1 text-blue-600 hover:bg-blue-100 hover:text-blue-800 transition-colors cursor-pointer"
+                                                            title="Assign Asset"
+                                                        >
+                                                            <UserCog className="h-4 w-4" />
+                                                        </button>
+                                                    )}
 
-            {
-                itemsPerPage !== "All" && totalPages > 1 && (
-                    <div className="flex justify-center gap-2">
-                        <button
-                            onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="rounded-md border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 disabled:opacity-50 hover:bg-slate-50 disabled:hover:bg-white transition-colors"
-                        >
-                            Previous
-                        </button>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                            <button
-                                key={page}
-                                onClick={() => handlePageChange(page)}
-                                className={`rounded-md border px-3 py-1 text-sm font-medium transition-colors ${currentPage === page
-                                    ? "bg-blue-600 text-white border-blue-600"
-                                    : "border-slate-300 text-slate-700 hover:bg-slate-50"
-                                    }`}
-                            >
-                                {page}
-                            </button>
-                        ))}
-                        <button
-                            onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className="rounded-md border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 disabled:opacity-50 hover:bg-slate-50 disabled:hover:bg-white transition-colors"
-                        >
-                            Next
-                        </button>
+
+                                                    <button
+                                                        onClick={() => handleDeleteClick(asset)}
+                                                        className="rounded p-1 text-red-600 hover:bg-red-100 hover:text-red-800 transition-colors cursor-pointer"
+                                                        title="Delete Asset"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
                     </div>
-                )
-            }
+                </div>
+
+                {
+                    itemsPerPage !== "All" && totalPages > 1 && (
+                        <div className="flex justify-center gap-2">
+                            <button
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="rounded-md border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 disabled:opacity-50 hover:bg-slate-50 disabled:hover:bg-white transition-colors"
+                            >
+                                Previous
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                <button
+                                    key={page}
+                                    onClick={() => handlePageChange(page)}
+                                    className={`rounded-md border px-3 py-1 text-sm font-medium transition-colors ${currentPage === page
+                                        ? "bg-blue-600 text-white border-blue-600"
+                                        : "border-slate-300 text-slate-700 hover:bg-slate-50"
+                                        }`}
+                                >
+                                    {page}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className="rounded-md border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 disabled:opacity-50 hover:bg-slate-50 disabled:hover:bg-white transition-colors"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    )
+                }
+            </div>
 
             {
                 selectedAsset && (
@@ -1080,6 +1135,21 @@ function InventoryContent() {
             }
 
             {
+                assetToView && (
+                    <AssetDetailModal
+                        asset={assetToView}
+                        isOpen={isViewModalOpen}
+                        onClose={() => setIsViewModalOpen(false)}
+                        onEdit={() => handleEditClick(assetToView)}
+                        onHistory={() => {
+                            setAssetToHistory(assetToView);
+                            setIsHistoryModalOpen(true);
+                        }}
+                    />
+                )
+            }
+
+            {
                 assetToEdit && (
                     <EditAssetModal
                         key={assetToEdit.id}
@@ -1087,16 +1157,6 @@ function InventoryContent() {
                         isOpen={isEditModalOpen}
                         onClose={() => setIsEditModalOpen(false)}
                         onSave={handleSaveEdit}
-                    />
-                )
-            }
-
-            {
-                assetToView && (
-                    <AssetDetailModal
-                        asset={assetToView}
-                        isOpen={isViewModalOpen}
-                        onClose={() => setIsViewModalOpen(false)}
                     />
                 )
             }
@@ -1123,6 +1183,10 @@ function InventoryContent() {
                 title={alertState.title}
                 message={alertState.message}
                 type={alertState.type}
+                showCancel={alertState.showCancel}
+                onConfirm={alertState.onConfirm}
+                confirmText={alertState.confirmText}
+                cancelText={alertState.cancelText}
             />
 
             {/* Delete Confirmation Modal */}
@@ -1159,6 +1223,21 @@ function InventoryContent() {
                                     {user?.name || "Unknown"}
                                 </div>
                             </div>
+
+
+                            <div className="mb-6">
+                                <label className="mb-2 block text-sm font-medium text-slate-700">
+                                    Reason (Optional)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={deleteReason}
+                                    onChange={(e) => setDeleteReason(e.target.value)}
+                                    placeholder="Enter reason for deletion..."
+                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-black placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                            </div>
+
                             <div className="flex justify-end gap-3">
                                 <button
                                     onClick={() => setIsDeleteModalOpen(false)}
@@ -1178,6 +1257,7 @@ function InventoryContent() {
                     </div>
                 )
             }
+
             {
                 isAddModalOpen && (
                     <AddAssetModal
@@ -1196,7 +1276,7 @@ function InventoryContent() {
                     />
                 )
             }
-        </div >
+        </motion.div>
     );
 }
 

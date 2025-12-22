@@ -1,14 +1,90 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useInventory } from "@/hooks/useInventory";
-import { Search, Filter, Upload, Calendar, X } from "lucide-react";
+import { Search, Filter, Upload, Calendar, X, FileText, User, ArrowUpDown } from "lucide-react";
 import * as XLSX from "xlsx";
 import { AlertModal } from "@/components/modals/AlertModal";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
+import { LogEntry } from "@/lib/types";
+import { motion, AnimatePresence } from "framer-motion";
+
+// Helper: Initials Avatar
+const InitialsAvatar = ({ name }: { name: string }) => {
+    const initials = name
+        .split(" ")
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase();
+
+    const colors = [
+        "bg-red-100 text-red-600",
+        "bg-orange-100 text-orange-600",
+        "bg-amber-100 text-amber-600",
+        "bg-green-100 text-green-600",
+        "bg-emerald-100 text-emerald-600",
+        "bg-teal-100 text-teal-600",
+        "bg-cyan-100 text-cyan-600",
+        "bg-sky-100 text-sky-600",
+        "bg-blue-100 text-blue-600",
+        "bg-indigo-100 text-indigo-600",
+        "bg-violet-100 text-violet-600",
+        "bg-purple-100 text-purple-600",
+        "bg-fuchsia-100 text-fuchsia-600",
+        "bg-pink-100 text-pink-600",
+        "bg-rose-100 text-rose-600",
+    ];
+
+    // Consistent color based on name length
+    const colorIndex = name.length % colors.length;
+    const colorClass = colors[colorIndex];
+
+    return (
+        <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${colorClass} shadow-sm ring-1 ring-white`}>
+            {initials}
+        </div>
+    );
+};
+
+// Helper: Safe Date Formatting
+function formatDateSafe(timestamp: string) {
+    try {
+        const date = new Date(timestamp);
+        if (isNaN(date.getTime())) return { date: "Invalid Date", time: "" };
+        return {
+            date: date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' }),
+            time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+        };
+    } catch {
+        return { date: "Error", time: "" };
+    }
+}
+
+function LogActionBadge({ action }: { action: string }) {
+    const styles = {
+        "Add": "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+        "Update": "bg-indigo-50 text-indigo-700 ring-indigo-600/20",
+        "Delete": "bg-red-50 text-red-700 ring-red-600/20",
+        "Check-in": "bg-sky-50 text-sky-700 ring-sky-600/20",
+        "Check-out": "bg-amber-50 text-amber-700 ring-amber-600/20",
+        "Dispose": "bg-slate-50 text-slate-700 ring-slate-600/20",
+        "Audit": "bg-violet-50 text-violet-700 ring-violet-600/20",
+        "Import": "bg-blue-50 text-blue-700 ring-blue-600/20",
+    };
+
+    const defaultStyle = "bg-gray-50 text-gray-600 ring-gray-500/10";
+    const className = styles[action as keyof typeof styles] || defaultStyle;
+
+    return (
+        <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${className}`}>
+            {action}
+        </span>
+    );
+}
 
 export default function LogsPage() {
-    const { logs } = useInventory();
+    const { logs, logsLoading } = useInventory();
     const [searchTerm, setSearchTerm] = useState("");
     const [actionFilter, setActionFilter] = useState<string>("All");
     const [startDate, setStartDate] = useState("");
@@ -33,41 +109,43 @@ export default function LogsPage() {
     // Resizable Columns
     const { columnWidths, startResizing } = useResizableColumns({
         date: "180px",
-        action: "100px",
-        asset: "150px",
-        performedBy: "150px",
-        details: "250px",
+        action: "120px",
+        asset: "160px",
+        performedBy: "200px",
+        details: "300px",
     });
 
-    const filteredLogs = logs.filter((log) => {
-        const matchesSearch =
-            log.computerNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            log.adminUser.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            log.details?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesAction = actionFilter === "All" || log.action === actionFilter;
+    const filteredLogs = useMemo(() => {
+        return logs.filter((log) => {
+            const matchesSearch =
+                log.computerNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                log.adminUser.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                log.details?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesAction = actionFilter === "All" || log.action === actionFilter;
 
-        let matchesDate = true;
-        if (startDate || endDate) {
-            const logDate = new Date(log.timestamp);
-            logDate.setHours(0, 0, 0, 0);
+            let matchesDate = true;
+            if (startDate || endDate) {
+                const logDate = new Date(log.timestamp);
+                logDate.setHours(0, 0, 0, 0);
 
-            const start = startDate ? new Date(startDate) : null;
-            if (start) start.setHours(0, 0, 0, 0);
+                const start = startDate ? new Date(startDate) : null;
+                if (start) start.setHours(0, 0, 0, 0);
 
-            const end = endDate ? new Date(endDate) : null;
-            if (end) end.setHours(0, 0, 0, 0);
+                const end = endDate ? new Date(endDate) : null;
+                if (end) end.setHours(0, 0, 0, 0);
 
-            if (start && end) {
-                matchesDate = logDate >= start && logDate <= end;
-            } else if (start) {
-                matchesDate = logDate >= start;
-            } else if (end) {
-                matchesDate = logDate <= end;
+                if (start && end) {
+                    matchesDate = logDate >= start && logDate <= end;
+                } else if (start) {
+                    matchesDate = logDate >= start;
+                } else if (end) {
+                    matchesDate = logDate <= end;
+                }
             }
-        }
 
-        return matchesSearch && matchesAction && matchesDate;
-    });
+            return matchesSearch && matchesAction && matchesDate;
+        });
+    }, [logs, searchTerm, actionFilter, startDate, endDate]);
 
     const handleExport = () => {
         if (filteredLogs.length === 0) {
@@ -95,7 +173,7 @@ export default function LogsPage() {
     };
 
     return (
-        <div className="space-y-6 pb-20 md:pb-0">
+        <div className="space-y-6 pb-20 md:pb-0 font-inter">
             <AlertModal
                 isOpen={alertState.isOpen}
                 onClose={() => setAlertState(prev => ({ ...prev, isOpen: false }))}
@@ -103,218 +181,245 @@ export default function LogsPage() {
                 message={alertState.message}
                 type={alertState.type}
             />
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-slate-900">Activity Logs</h1>
+
+            {/* Header */}
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Activity Logs</h1>
+                    <p className="text-sm text-slate-500 mt-1">Track and audit all asset movements and changes.</p>
+                </div>
                 <button
                     onClick={handleExport}
-                    className="flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700 shadow-sm cursor-pointer"
-                    title="Export Activity Logs to Excel"
+                    className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                    <Upload className="h-4 w-4" />
-                    <span className="hidden md:inline">Export Report</span>
-                    <span className="md:hidden">Export</span>
+                    <Upload className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" />
+                    <span>Export Report</span>
                 </button>
             </div>
 
-            <div className="flex flex-col gap-3 rounded-lg bg-white p-3 shadow-md border border-slate-100 md:p-4">
-                <div className="grid grid-cols-2 gap-1 md:flex md:items-center md:gap-4">
+            {/* Filters */}
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-12 md:gap-6">
                     {/* Search */}
-                    <div className="relative col-span-1 min-w-0 md:flex-1">
-                        <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <div className="md:col-span-4 relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         <input
                             type="text"
-                            placeholder="Search logs..."
+                            placeholder="Search by Asset ID, User, or Details..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full min-w-0 rounded-md border border-slate-300 pl-8 pr-2 py-2 text-xs text-black placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 md:text-sm md:pl-10 md:pr-4"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                         />
                     </div>
 
-                    {/* Filter */}
-                    <div className="relative col-span-1 min-w-0 md:w-48">
-                        <Filter className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    {/* Action Filter */}
+                    <div className="md:col-span-3 relative">
+                        <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         <select
                             value={actionFilter}
                             onChange={(e) => setActionFilter(e.target.value)}
-                            className="w-full min-w-0 appearance-none rounded-md border border-slate-300 bg-white pl-8 pr-6 py-2 text-xs text-black focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 md:text-sm md:pl-10 md:pr-8"
+                            className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-8 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer"
                         >
                             <option value="All">All Actions</option>
-                            <option value="Add">Add</option>
-                            <option value="Update">Update</option>
-                            <option value="Delete">Delete</option>
+                            <option value="Add">Add Asset</option>
+                            <option value="Update">Update Asset</option>
+                            <option value="Delete">Delete Asset</option>
                             <option value="Check-in">Check-in</option>
                             <option value="Check-out">Check-out</option>
                             <option value="Dispose">Dispose</option>
                             <option value="Audit">Audit</option>
+                            <option value="Import">Bulk Import</option>
                         </select>
+                        <ArrowUpDown className="absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400 pointer-events-none opacity-50" />
                     </div>
 
-                    {/* From Date - Desktop Only */}
-                    <div className="relative col-span-2 md:col-span-1 md:w-auto hidden md:block">
-                        <div className="flex flex-col gap-1.5 md:flex-row md:items-center md:gap-2">
-                            <span className="text-xs font-medium text-slate-500 ml-1 md:hidden">From</span>
-                            <div className="relative w-full">
-                                <Calendar className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    max={endDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="w-full rounded-md border border-slate-300 pl-10 pr-2 py-2 text-sm text-black focus:border-blue-500 focus:outline-none"
-                                />
-                            </div>
+                    {/* Date Range */}
+                    {/* Date Range */}
+                    <div className="md:col-span-12 lg:col-span-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div className="relative flex-1">
+                            <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            <input
+                                type="date"
+                                value={startDate}
+                                max={endDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none min-w-[130px]"
+                                placeholder="Start Date" // Note: placeholder doesn't always show for date inputs in all browsers
+                                aria-label="Start Date"
+                            />
                         </div>
-                    </div>
-
-                    {/* To Date - Desktop Only */}
-                    <div className="relative col-span-2 md:col-span-1 md:w-auto hidden md:block">
-                        <div className="flex flex-col gap-1.5 md:flex-row md:items-center md:gap-2">
-                            <span className="text-xs font-medium text-slate-500 ml-1 md:hidden">To</span>
-                            <div className="relative w-full">
-                                <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    min={startDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="w-full rounded-md border border-slate-300 pl-10 pr-2 py-2 text-sm text-black focus:border-blue-500 focus:outline-none"
-                                />
-                            </div>
+                        <span className="text-slate-400 text-sm font-medium text-center hidden sm:block">to</span>
+                        <div className="relative flex-1">
+                            <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            <input
+                                type="date"
+                                value={endDate}
+                                min={startDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none min-w-[130px]"
+                                placeholder="End Date"
+                                aria-label="End Date"
+                            />
                         </div>
-                    </div>
-
-                    {/* Clear Date - Desktop Only */}
-                    {(startDate || endDate) && (
-                        <div className="col-span-2 md:col-span-1 md:w-auto hidden md:block">
+                        {(startDate || endDate) && (
                             <button
-                                onClick={() => {
-                                    setStartDate("");
-                                    setEndDate("");
-                                }}
-                                className="flex w-full items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm cursor-pointer md:w-auto"
-                                title="Clear Date Filters"
+                                onClick={() => { setStartDate(""); setEndDate(""); }}
+                                className="sm:w-auto p-2.5 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-red-500 transition-colors flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
+                                title="Clear Dates"
                             >
                                 <X className="h-4 w-4" />
-                                Clear Date
+                                <span className="sm:hidden ml-2 text-sm font-medium">Clear Dates</span>
                             </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Mobile Card View */}
-            <div className="grid gap-4 md:hidden">
-                {filteredLogs.length === 0 ? (
-                    <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
-                        No logs found matching your criteria.
+                        )}
                     </div>
-                ) : (
-                    filteredLogs.map((log) => (
-                        <div key={log.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                            <div className="flex items-center justify-between mb-3">
-                                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold leading-5 ${log.action === "Add" ? "bg-green-100 text-green-800 border border-green-200" :
-                                    log.action === "Delete" ? "bg-red-100 text-red-800 border border-red-200" :
-                                        log.action === "Update" ? "bg-purple-100 text-purple-800 border border-purple-200" :
-                                            log.action === "Check-in" ? "bg-sky-100 text-sky-800 border border-sky-200" :
-                                                log.action === "Check-out" ? "bg-amber-100 text-amber-800 border border-amber-200" :
-                                                    log.action === "Dispose" ? "bg-slate-700 text-slate-100 border border-slate-600" :
-                                                        "bg-slate-100 text-slate-800 border border-slate-200"
-                                    }`}>
-                                    {log.action}
-                                </span>
-                                <span className="text-xs text-slate-500">{new Date(log.timestamp).toLocaleString()}</span>
-                            </div>
-                            <div className="mb-2">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="text-xs text-slate-500 mb-0.5">Asset</p>
-                                        <p className="text-sm font-bold text-slate-900">{log.computerNo}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-xs text-slate-500 mb-0.5">Performed By</p>
-                                        <p className="text-sm font-medium text-slate-700">{log.adminUser}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            {log.details && (
-                                <div className="mt-3 border-t border-slate-100 pt-2">
-                                    <p className="text-xs text-slate-500 mb-1">Details</p>
-                                    <p className="text-sm text-slate-600">{log.details}</p>
-                                </div>
-                            )}
-                        </div>
-                    ))
-                )}
-            </div>
+                </div>
+            </motion.div>
 
-            <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md md:block">
-                <div className="max-h-[600px] overflow-y-auto">
-                    <table className="min-w-full divide-y divide-slate-200 table-fixed">
-                        <thead className="bg-slate-100 sticky top-0 z-10 shadow-sm">
+            {/* Table */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="hidden md:block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+            >
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+                        <thead className="bg-slate-50/80 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 sticky top-0 z-10">
                             <tr>
                                 {[
-                                    { id: "date", label: "Date & Time" },
-                                    { id: "action", label: "Action" },
-                                    { id: "asset", label: "Asset" },
-                                    { id: "performedBy", label: "Performed By" },
-                                    { id: "details", label: "Details" },
+                                    { id: "date", label: "Date & Time", icon: Calendar },
+                                    { id: "action", label: "Action", icon: FileText },
+                                    { id: "asset", label: "Asset Information" },
+                                    { id: "performedBy", label: "Performed By", icon: User },
+                                    { id: "details", label: "Details / Notes", icon: FileText },
                                 ].map((col) => (
                                     <th
                                         key={col.id}
-                                        className="relative px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700 select-none group overflow-hidden text-ellipsis whitespace-nowrap"
+                                        className="relative group px-6 py-4 font-semibold text-slate-700 select-none whitespace-nowrap"
                                         style={{ width: columnWidths[col.id] }}
                                     >
-                                        {col.label}
-                                        <div
-                                            className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-blue-400/20 group-hover:bg-slate-300/50 z-20"
-                                            onMouseDown={(e) => startResizing(e, col.id)}
-                                        >
-                                            <div className="absolute right-0 top-0 h-full w-[1px] bg-slate-200 group-hover:bg-blue-400" />
+                                        <div className="flex items-center gap-2">
+                                            {col.icon && <col.icon className="h-3.5 w-3.5 text-slate-400" />}
+                                            {col.label}
                                         </div>
+                                        {/* Resize Handle */}
+                                        <div
+                                            className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400/50 group-hover:bg-slate-200/50"
+                                            onMouseDown={(e) => startResizing(e, col.id)}
+                                        />
                                     </th>
                                 ))}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 bg-white">
-                            {filteredLogs.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
-                                        No logs found matching your criteria.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {new Date(log.timestamp).toLocaleString()}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4">
-                                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold leading-5 ${log.action === "Add" ? "bg-green-100 text-green-800 border border-green-200" :
-                                                log.action === "Delete" ? "bg-red-100 text-red-800 border border-red-200" :
-                                                    log.action === "Update" ? "bg-purple-100 text-purple-800 border border-purple-200" :
-                                                        log.action === "Check-in" ? "bg-sky-100 text-sky-800 border border-sky-200" :
-                                                            log.action === "Check-out" ? "bg-amber-100 text-amber-800 border border-amber-200" :
-                                                                log.action === "Dispose" ? "bg-slate-700 text-slate-100 border border-slate-600" :
-                                                                    "bg-slate-100 text-slate-800 border border-slate-200"
-                                                }`}>
-                                                {log.action}
-                                            </span>
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-900">
-                                            {log.computerNo}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-700">
-                                            {log.adminUser}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">
-                                            {log.details || "-"}
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                            <AnimatePresence>
+                                {logsLoading ? (
+                                    [...Array(5)].map((_, i) => (
+                                        <tr key={i} className="animate-pulse">
+                                            <td className="px-6 py-4"><div className="h-4 w-32 rounded bg-slate-100" /></td>
+                                            <td className="px-6 py-4"><div className="h-6 w-20 rounded bg-slate-100" /></td>
+                                            <td className="px-6 py-4"><div className="h-4 w-24 rounded bg-slate-100" /></td>
+                                            <td className="px-6 py-4"><div className="h-8 w-8 rounded-full bg-slate-100" /></td>
+                                            <td className="px-6 py-4"><div className="h-4 w-48 rounded bg-slate-100" /></td>
+                                        </tr>
+                                    ))
+                                ) : filteredLogs.length > 0 ? (
+                                    filteredLogs.map((log, index) => {
+                                        const { date, time } = formatDateSafe(log.timestamp);
+                                        return (
+                                            <motion.tr
+                                                key={log.id}
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: index * 0.03 }}
+                                                className="group hover:bg-blue-50/30 transition-colors"
+                                            >
+                                                {/* Date */}
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-semibold text-slate-700">{date}</span>
+                                                        <span className="text-xs text-slate-400 font-mono mt-0.5">{time}</span>
+                                                    </div>
+                                                </td>
+
+                                                {/* Action */}
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <LogActionBadge action={log.action} />
+                                                </td>
+
+                                                {/* Asset */}
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono font-medium text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-xs border border-slate-200">
+                                                            {log.computerNo}
+                                                        </span>
+                                                    </div>
+                                                </td>
+
+                                                {/* Performed By */}
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center gap-3">
+                                                        <InitialsAvatar name={log.adminUser} />
+                                                        <span className="font-medium text-slate-700">{log.adminUser}</span>
+                                                    </div>
+                                                </td>
+
+                                                {/* Details */}
+                                                <td className="px-6 py-4 text-slate-600">
+                                                    {log.details ? (
+                                                        <span className="line-clamp-2" title={log.details}>
+                                                            {log.details}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-400 italic text-xs">-</span>
+                                                    )}
+                                                </td>
+                                            </motion.tr>
+                                        );
+                                    })
+                                ) : (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                                            No activity logs found.
                                         </td>
                                     </tr>
-                                ))
-                            )}
+                                )}
+                            </AnimatePresence>
                         </tbody>
                     </table>
                 </div>
+            </motion.div>
+
+            {/* Mobile List View (Optimized) */}
+            <div className="md:hidden space-y-4">
+                {filteredLogs.map((log) => {
+                    const { date, time } = formatDateSafe(log.timestamp);
+                    return (
+                        <div key={log.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div className="flex items-center justify-between mb-3">
+                                <LogActionBadge action={log.action} />
+                                <span className="text-xs text-slate-400 font-mono">{date} {time}</span>
+                            </div>
+                            <div className="flex items-center gap-3 mb-3">
+                                <InitialsAvatar name={log.adminUser} />
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900">{log.adminUser}</p>
+                                    <p className="text-xs text-slate-500">Action performed on <span className="font-mono bg-slate-100 px-1 rounded">{log.computerNo}</span></p>
+                                </div>
+                            </div>
+                            {log.details && (
+                                <div className="mt-2 pt-2 border-t border-slate-100">
+                                    <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Details</p>
+                                    <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded-lg">{log.details}</p>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

@@ -109,7 +109,7 @@ export default function SecondHandPage() {
                 </div>
                 <button
                     onClick={handleExport}
-                    className="flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 shadow-sm md:w-auto w-full cursor-pointer whitespace-nowrap"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] md:w-auto w-full cursor-pointer whitespace-nowrap"
                 >
                     <Upload className="h-4 w-4" />
                     Export Report
