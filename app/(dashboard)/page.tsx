@@ -169,7 +169,7 @@ export default function DashboardPage() {
                         </Link>
                         <button
                             onClick={handleExportPDF}
-                            className="flex items-center justify-between rounded-md border border-slate-200 p-4 hover:bg-slate-50 cursor-pointer"
+                            className="hidden md:flex items-center justify-between rounded-md border border-slate-200 p-4 hover:bg-slate-50 cursor-pointer"
                         >
                             <span className="font-medium text-slate-700">Export Report (PDF)</span>
                             <FileText className="h-5 w-5 text-slate-400" />

@@ -412,7 +412,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                                 {/* Main Action Area */}
                                 {showConflictResolution ? (
                                     <div className="space-y-6 animate-in fade-in duration-300">
-                                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                                             <div className="flex gap-3">
                                                 <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
                                                 <div>
@@ -424,13 +424,13 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                                             </div>
                                         </div>
 
-                                        <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 shadow-sm">
+                                        <div className="max-h-60 overflow-y-auto rounded-2xl border border-slate-200 shadow-sm">
                                             <table className="min-w-full divide-y divide-slate-200">
-                                                <thead className="bg-slate-50 sticky top-0">
+                                                <thead className="bg-slate-50/80 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 sticky top-0 z-10">
                                                     <tr>
-                                                        <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Computer No.</th>
-                                                        <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial No.</th>
-                                                        <th className="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                                        <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Computer No.</th>
+                                                        <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Serial No.</th>
+                                                        <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">Status</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="bg-white divide-y divide-slate-200">
@@ -462,7 +462,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                                     </div>
                                 ) : errors.length > 0 ? (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-                                        <div className="rounded-xl bg-red-50 p-4 border border-red-100">
+                                        <div className="rounded-2xl bg-red-50 p-4 border border-red-100">
                                             <div className="flex">
                                                 <div className="flex-shrink-0">
                                                     <X className="h-5 w-5 text-red-500" />
@@ -491,7 +491,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                                     </div>
                                 ) : !summary ? (
                                     <div
-                                        className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all duration-300 ${isDragging
+                                        className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all duration-300 ${isDragging
                                             ? "border-blue-500 bg-blue-50/50 scale-[0.99]"
                                             : "border-slate-300 bg-white hover:border-blue-400 hover:bg-slate-50"
                                             } h-64`}

@@ -653,7 +653,7 @@ function InventoryContent() {
             </div>
 
             {/* Mobile Action Buttons */}
-            <div className="grid grid-cols-3 gap-3 md:hidden">
+            <div className="grid grid-cols-2 gap-3 md:hidden">
                 <button
                     onClick={() => setIsImportModalOpen(true)}
                     className="flex flex-col items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-slate-700 shadow-sm hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
@@ -662,15 +662,6 @@ function InventoryContent() {
                         <Download className="h-5 w-5 text-slate-600" />
                     </div>
                     <span className="text-xs font-medium">Import</span>
-                </button>
-                <button
-                    onClick={handleExport}
-                    className="flex flex-col items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-slate-700 shadow-sm hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
-                >
-                    <div className="rounded-full bg-emerald-100 p-2">
-                        <Upload className="h-5 w-5 text-emerald-600" />
-                    </div>
-                    <span className="text-xs font-medium">Export</span>
                 </button>
                 <button
                     onClick={() => setIsAddModalOpen(true)}
@@ -925,12 +916,12 @@ function InventoryContent() {
                 </div>
 
                 {/* Desktop Table View */}
-                <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md md:block">
+                <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md md:block">
                     <div className="max-h-[600px] overflow-y-auto">
                         <table className="min-w-full divide-y divide-slate-200 table-fixed">
-                            <thead className="bg-slate-100 sticky top-0 z-10 shadow-sm">
+                            <thead className="bg-slate-50/80 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 sticky top-0 z-10">
                                 <tr>
-                                    <th className="relative px-6 py-3 text-left" style={{ width: columnWidths.checkbox }}>
+                                    <th className="relative px-6 py-4 text-left" style={{ width: columnWidths.checkbox }}>
                                         <input
                                             type="checkbox"
                                             className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
@@ -948,7 +939,7 @@ function InventoryContent() {
                                     ].map((col) => (
                                         <th
                                             key={col.id}
-                                            className="relative px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-700 select-none group overflow-hidden text-ellipsis whitespace-nowrap cursor-pointer hover:bg-slate-200 transition-colors"
+                                            className="relative px-6 py-4 text-left text-sm font-semibold text-slate-700 select-none group overflow-hidden text-ellipsis whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors"
                                             style={{ width: columnWidths[col.id] }}
                                             onClick={() => handleSort(col.id as any)}
                                         >
@@ -975,7 +966,7 @@ function InventoryContent() {
                                             </div>
                                         </th>
                                     ))}
-                                    <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-700" style={{ width: columnWidths.actions }}>Actions</th>
+                                    <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700" style={{ width: columnWidths.actions }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 bg-white">

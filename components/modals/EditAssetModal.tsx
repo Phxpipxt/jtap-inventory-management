@@ -156,6 +156,20 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
             return;
         }
 
+        // Auto-fix condition and remarks based on status
+        let finalCondition = asset.condition;
+        let finalRemarks = remarks;
+
+        if (status === "In Stock" || status === "In Use" || status === "Assigned") {
+            finalCondition = "Working";
+            // If the asset is now working, clear any previous "Issue: " remarks
+            if (finalRemarks && finalRemarks.startsWith("Issue: ")) {
+                finalRemarks = "";
+            }
+        } else if (status === "Broken") {
+            finalCondition = "Not Working";
+        }
+
         const updatedAsset: Asset = {
             ...asset,
             computerNo,
@@ -163,10 +177,11 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
             brand: brand || undefined,
             model: model || undefined,
             status,
+            condition: finalCondition,
             purchaseDate: purchaseDate || undefined,
             warrantyExpiry: warrantyExpiry || undefined,
             tags: tags ? tags.split(",").map(t => t.trim()) : undefined,
-            remarks: remarks || undefined,
+            remarks: finalRemarks || undefined,
             hdd: hdd || undefined,
             ram: ram || undefined,
             cpu: cpu || undefined,

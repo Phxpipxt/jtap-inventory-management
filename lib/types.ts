@@ -55,10 +55,12 @@ export interface Asset {
     empId?: string | null;
     department?: Department | null;
     status: AssetStatus;
+    condition?: string | null;
     purchaseDate?: string; // ISO Date
     warrantyExpiry?: string; // ISO Date
     tags?: string[]; // e.g., "High Performance", "Developer"
     remarks?: string; // Additional notes or comments
+    issues?: string | null; // Specific issues if condition is Not Working
     hdd?: string; // Optional HDD/SSD
     ram?: string; // Optional RAM
     cpu?: string; // Optional CPU

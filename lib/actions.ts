@@ -22,6 +22,7 @@ export async function getAssets(): Promise<Asset[]> {
         owner: a.owner || undefined,
         empId: a.empId || undefined,
         remarks: a.remarks || undefined,
+        issues: a.issues || undefined,
         hdd: a.hdd || undefined,
         ram: a.ram || undefined,
         cpu: a.cpu || undefined,
@@ -71,12 +72,10 @@ export async function createAsset(asset: Asset, adminUser: string, log?: LogEntr
     });
 
     revalidatePath("/inventory");
-    if (log) revalidatePath("/logs");
 }
 
-export async function updateAsset(asset: Asset, adminUser: string) {
+export async function updateAsset(asset: Asset, adminUser: string, action: string = "Update", details?: string) {
     const { images, ...data } = asset;
-    console.log("DEBUG: updateAsset received:", { id: asset.id, cpu: asset.cpu, ram: asset.ram, hdd: asset.hdd });
 
     // We need to handle images carefully: 
     // Simplified strategy: Delete all existing images for this asset and recreate them.
@@ -84,7 +83,6 @@ export async function updateAsset(asset: Asset, adminUser: string) {
 
     await prisma.$transaction(async (tx: any) => {
         // 1. Update clean fields
-        console.log("DEBUG: Prisma update payload:", data);
         await tx.asset.update({
             where: { id: asset.id },
             data: {
@@ -112,9 +110,24 @@ export async function updateAsset(asset: Asset, adminUser: string) {
                 });
             }
         }
+
+        // 3. Create Log
+        await tx.logEntry.create({
+            data: {
+                id: crypto.randomUUID(),
+                assetId: asset.id,
+                computerNo: asset.computerNo,
+                serialNo: asset.serialNo,
+                action: action,
+                adminUser: adminUser,
+                details: details || `Asset ${asset.computerNo} updated`,
+                timestamp: new Date()
+            }
+        });
     });
 
     revalidatePath("/inventory");
+    revalidatePath("/logs");
 }
 
 export async function deleteAsset(id: string) {
@@ -156,7 +169,6 @@ export async function createLog(log: LogEntry) {
         }
     });
 
-    // No cache revalidation strictly needed for global logs unless we have a page for it?
     revalidatePath("/logs");
 }
 

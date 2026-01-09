@@ -19,10 +19,12 @@ model Asset {
   empId            String?
   department       String?
   status           String
+  condition        String?
   purchaseDate     DateTime?
   warrantyExpiry   DateTime?
   tags             String[]
   remarks          String?
+  issues           String?
   hdd              String?
   ram              String?
   cpu              String?
@@ -32,6 +34,12 @@ model Asset {
 
   images Image[]
   logs   LogEntry[]
+
+  @@unique([computerNo])
+  @@unique([serialNo])
+  @@index([status])
+  @@index([department])
+  @@index([purchaseDate])
 }
 
 model Image {
@@ -52,6 +60,10 @@ model LogEntry {
   timestamp  DateTime
   adminUser  String
   details    String?
+
+  @@index([assetId])
+  @@index([timestamp])
+  @@index([action])
 }
 
 model AuditLog {
@@ -70,4 +82,7 @@ model AuditLog {
   supervisor1VerifiedAt DateTime?
 
   verificationStatus    String?
+
+  @@index([date])
+  @@index([status])
 }

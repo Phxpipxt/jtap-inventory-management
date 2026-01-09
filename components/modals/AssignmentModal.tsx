@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Asset, Department, PERSONS_IN_CHARGE } from "@/lib/types";
-import { X } from "lucide-react";
+import { X, User, AlertTriangle } from "lucide-react";
 
 interface AssignmentModalProps {
     asset: Asset;
@@ -46,13 +46,20 @@ export function AssignmentModal({ asset, isOpen, onClose, onSave }: AssignmentMo
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-            <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-                <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-slate-800">
-                        {action === "Return" ? "Return Asset" : "Assign Asset"}: {asset.computerNo}
-                    </h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                        <X className="h-6 w-6" />
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="mb-6 flex items-start justify-between border-b border-slate-100 pb-4">
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-900">
+                            {action === "Return" ? "Return Asset" : "Assign Asset"}
+                        </h2>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="font-mono text-sm font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{asset.computerNo}</span>
+                            <span className="text-xs text-slate-400">•</span>
+                            <span className="font-mono text-xs text-slate-500">SN: {asset.serialNo}</span>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
@@ -65,7 +72,7 @@ export function AssignmentModal({ asset, isOpen, onClose, onSave }: AssignmentMo
                                     type="text"
                                     value={owner}
                                     onChange={(e) => setOwner(e.target.value)}
-                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-black focus:border-blue-500 focus:outline-none"
+                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-black focus:border-blue-500 focus:outline-none"
                                     required
                                 />
                             </div>
@@ -92,7 +99,7 @@ export function AssignmentModal({ asset, isOpen, onClose, onSave }: AssignmentMo
                                             setEmpId(val);
                                         }
                                     }}
-                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-black focus:border-blue-500 focus:outline-none"
+                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-black focus:border-blue-500 focus:outline-none"
                                     required
                                 />
                             </div>
@@ -101,7 +108,7 @@ export function AssignmentModal({ asset, isOpen, onClose, onSave }: AssignmentMo
                                 <select
                                     value={department}
                                     onChange={(e) => setDepartment(e.target.value as Department)}
-                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-black focus:border-blue-500 focus:outline-none"
+                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-black focus:border-blue-500 focus:outline-none"
                                     required
                                 >
                                     <option value="">Select Department</option>
@@ -125,11 +132,30 @@ export function AssignmentModal({ asset, isOpen, onClose, onSave }: AssignmentMo
                     )}
 
                     {action === "Return" && (
-                        <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800">
-                            <p className="font-medium">Return to Stock?</p>
-                            <p className="mt-1">This will clear the current owner information and set the status to "In Stock".</p>
-                            <div className="mt-2 text-xs text-slate-500">
-                                Current Owner: <span className="font-medium text-slate-700">{asset.owner}</span>
+                        <div className="space-y-4">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3 block">Currently Assigned To</span>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600 ring-4 ring-white shadow-sm">
+                                        <User className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xl font-bold text-slate-900">{asset.owner}</p>
+                                        <div className="flex items-center gap-2 text-sm text-slate-500">
+                                            <span>{asset.empId || "No ID"}</span>
+                                            <span>•</span>
+                                            <span>{asset.department || "No Dept"}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 flex gap-3 items-start">
+                                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                                <div className="text-sm text-amber-900">
+                                    <p className="font-semibold">Confirm Return to Stock?</p>
+                                    <p className="mt-0.5 opacity-90">This action will remove the current owner and update status to <span className="font-bold">In Stock</span>.</p>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -138,7 +164,7 @@ export function AssignmentModal({ asset, isOpen, onClose, onSave }: AssignmentMo
                         <label className="mb-1 block text-sm font-medium text-slate-700">
                             Person In Charge
                         </label>
-                        <div className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">
+                        <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">
                             {user?.name}
                         </div>
                     </div>
@@ -168,7 +194,7 @@ export function AssignmentModal({ asset, isOpen, onClose, onSave }: AssignmentMo
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
+                                className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
                             >
                                 Cancel
                             </button>

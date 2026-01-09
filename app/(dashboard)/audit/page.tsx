@@ -8,6 +8,7 @@ import { ScanBarcode, CheckCircle, AlertCircle, RefreshCw, Download, Camera, X, 
 import { Html5Qrcode } from "html5-qrcode";
 import { AlertModal } from "@/components/modals/AlertModal";
 import { motion } from "framer-motion";
+import { AuditSkeleton } from "@/components/skeletons/AppSkeletons";
 
 export default function AuditPage() {
     const { assets, loading, saveAuditLog } = useInventory();
@@ -263,7 +264,8 @@ export default function AuditPage() {
 
 
 
-    if (loading) return <div className="p-8">Loading...</div>;
+    if (loading) return <AuditSkeleton />;
+
 
     return (
 
@@ -342,7 +344,7 @@ export default function AuditPage() {
                     <div className="flex-1 flex items-center justify-center bg-black relative">
                         <div id="audit-reader" className="w-full max-w-md overflow-hidden rounded-xl border-2 border-white/20 shadow-2xl"></div>
                         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                            <div className="w-64 h-64 border-2 border-white/50 rounded-lg"></div>
+                            <div className="w-64 h-64 border-2 border-white/50 rounded-2xl"></div>
                         </div>
                     </div>
                     <div className="p-8 text-center text-white/70 bg-black/80 backdrop-blur-md z-20">
@@ -467,7 +469,7 @@ export default function AuditPage() {
                             </div>
                             <h2 className="font-bold text-slate-900">Scanned Assets</h2>
                         </div>
-                        <span className="text-xs font-bold bg-white border border-slate-200 px-2 py-1 rounded-md text-slate-500">
+                        <span className="text-xs font-bold bg-white border border-slate-200 px-2 py-1 rounded-lg text-slate-500">
                             {scannedAssetsList.length} Items
                         </span>
                     </div>
@@ -495,11 +497,11 @@ export default function AuditPage() {
 
                         {/* Desktop Table */}
                         <table className="hidden min-w-full divide-y divide-slate-100 md:table">
-                            <thead className="bg-slate-50 sticky top-0 z-10">
+                            <thead className="bg-slate-50/80 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 sticky top-0 z-10">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Asset</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Details</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
+                                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Asset</th>
+                                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Details</th>
+                                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 bg-white">
@@ -541,7 +543,7 @@ export default function AuditPage() {
                             </div>
                             <h2 className="font-bold text-slate-900">Missing Assets</h2>
                         </div>
-                        <span className="text-xs font-bold bg-white border border-slate-200 px-2 py-1 rounded-md text-slate-500">
+                        <span className="text-xs font-bold bg-white border border-slate-200 px-2 py-1 rounded-lg text-slate-500">
                             {missingAssetsList.length} Items
                         </span>
                     </div>
@@ -565,11 +567,11 @@ export default function AuditPage() {
 
                         {/* Desktop Table */}
                         <table className="hidden min-w-full divide-y divide-slate-100 md:table">
-                            <thead className="bg-slate-50 sticky top-0 z-10">
+                            <thead className="bg-slate-50/80 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 sticky top-0 z-10">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Asset</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Details</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
+                                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Asset</th>
+                                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Details</th>
+                                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 bg-white">

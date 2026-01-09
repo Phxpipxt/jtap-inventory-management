@@ -265,6 +265,14 @@ export function AddAssetModal({ isOpen, onClose, onAdd }: AddAssetModalProps) {
             return;
         }
 
+        // Determine condition based on status
+        let condition: string | undefined = undefined;
+        if (status === "In Stock" || status === "In Use" || status === "Assigned") {
+            condition = "Working";
+        } else if (status === "Broken") {
+            condition = "Not Working";
+        }
+
         const newAsset: Asset = {
             id: crypto.randomUUID(),
             computerNo,
@@ -272,6 +280,7 @@ export function AddAssetModal({ isOpen, onClose, onAdd }: AddAssetModalProps) {
             brand: brand || undefined,
             model: model || undefined,
             status,
+            condition,
             purchaseDate: purchaseDate || undefined,
             warrantyExpiry: warrantyExpiry || undefined,
             tags: tags ? tags.split(",").map(t => t.trim()) : undefined,

@@ -3,7 +3,7 @@
 
 import { useState, useRef } from "react";
 import { Asset } from "@/lib/types";
-import { X, Printer, Download, Check, HardDrive, Cpu, MemoryStick, Image as ImageIcon } from "lucide-react";
+import { X, Printer, Download, Check, HardDrive, Cpu, MemoryStick, Image as ImageIcon, Activity } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { PrintableAssetDetail } from "@/components/PrintableAssetDetail";
 
@@ -15,6 +15,7 @@ interface ExportOptionsModalProps {
 
 export function ExportOptionsModal({ asset, isOpen, onClose }: ExportOptionsModalProps) {
     const [options, setOptions] = useState({
+        showCondition: true,
         showHdd: true,
         showRam: true,
         showCpu: true,
@@ -61,7 +62,7 @@ export function ExportOptionsModal({ asset, isOpen, onClose }: ExportOptionsModa
             pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
             heightLeft -= pdfHeight;
 
-            while (heightLeft > 0) {
+            while (heightLeft > 5) {
                 position = heightLeft - imgHeight;
                 pdf.addPage();
                 pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
@@ -72,7 +73,7 @@ export function ExportOptionsModal({ asset, isOpen, onClose }: ExportOptionsModa
 
         } catch (error) {
             console.error("PDF Generation failed:", error);
-            alert("Failed to generate PDF. Please try again.");
+            alert(`Failed to generate PDF: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
             setIsGenerating(false);
         }
@@ -137,6 +138,12 @@ export function ExportOptionsModal({ asset, isOpen, onClose }: ExportOptionsModa
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">Report Content</h3>
 
                                 <div className="space-y-3">
+                                    <OptionCard
+                                        label="Condition Status"
+                                        icon={Activity}
+                                        checked={options.showCondition}
+                                        onChange={(v) => setOptions({ ...options, showCondition: v })}
+                                    />
                                     <OptionCard
                                         label="Hard Drive (Storage)"
                                         icon={HardDrive}
@@ -225,7 +232,7 @@ export function ExportOptionsModal({ asset, isOpen, onClose }: ExportOptionsModa
             </div>
 
             {/* Hidden Printable Component - For Capture */}
-            <div className="absolute top-0 left-[-9999px]">
+            <div className="fixed top-0 left-0 opacity-0 -z-50 pointer-events-none">
                 <PrintableAssetDetail
                     ref={printRef}
                     asset={asset}

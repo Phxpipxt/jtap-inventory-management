@@ -96,7 +96,7 @@ export default function SecondHandPage() {
 
             </div>
 
-            <div className="flex flex-col gap-3 rounded-lg bg-white p-4 shadow-md border border-slate-100 md:flex-row md:gap-4">
+            <div className="flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-md border border-slate-100 md:flex-row md:gap-4">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                     <input
@@ -104,12 +104,12 @@ export default function SecondHandPage() {
                         placeholder="Search computer no, serial..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full rounded-md border border-slate-300 pl-10 pr-4 py-2 text-black placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full rounded-xl border border-slate-300 pl-10 pr-4 py-2 text-black placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                 </div>
                 <button
                     onClick={handleExport}
-                    className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] md:w-auto w-full cursor-pointer whitespace-nowrap"
+                    className="hidden md:flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] md:w-auto w-full cursor-pointer whitespace-nowrap"
                 >
                     <Upload className="h-4 w-4" />
                     Export Report
@@ -119,7 +119,7 @@ export default function SecondHandPage() {
             {/* Mobile View (Cards) */}
             <div className="grid gap-4 md:hidden">
                 {filteredAssets.length === 0 ? (
-                    <div className="rounded-lg bg-white p-8 text-center text-sm text-slate-500 shadow-sm border border-slate-200">
+                    <div className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500 shadow-sm border border-slate-200">
                         No second-hand assets found.
                     </div>
                 ) : (
@@ -129,7 +129,7 @@ export default function SecondHandPage() {
                             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
 
                         return (
-                            <div key={asset.id} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 space-y-3">
+                            <div key={asset.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3">
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <div className="font-semibold text-slate-900">{asset.computerNo}</div>
@@ -160,7 +160,7 @@ export default function SecondHandPage() {
 
                                 <button
                                     onClick={() => handleViewHistory(asset)}
-                                    className="w-full flex items-center justify-center gap-2 rounded-md bg-slate-100 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-100 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
                                     title="View usage history"
                                 >
                                     <History className="h-4 w-4" />
@@ -173,15 +173,15 @@ export default function SecondHandPage() {
             </div>
 
             {/* Desktop View (Table) */}
-            <div className="hidden md:block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md">
+            <div className="hidden md:block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200">
-                        <thead className="bg-slate-50">
+                        <thead className="bg-slate-50/80 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 sticky top-0 z-10">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Asset Info</th>
-                                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Current Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Last Return</th>
-                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th>
+                                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Asset Info</th>
+                                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Current Status</th>
+                                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Last Return</th>
+                                <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
@@ -230,7 +230,7 @@ export default function SecondHandPage() {
                                             <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                                                 <button
                                                     onClick={() => handleViewHistory(asset)}
-                                                    className="inline-flex items-center gap-1 rounded bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                                                    className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
                                                     title="View usage history"
                                                 >
                                                     <History className="h-3.5 w-3.5" />

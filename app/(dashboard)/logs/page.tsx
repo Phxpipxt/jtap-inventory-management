@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useInventory } from "@/hooks/useInventory";
-import { Search, Filter, Upload, Calendar, X, FileText, User, ArrowUpDown } from "lucide-react";
+import { Search, Filter, Upload, Calendar, X, FileText, User, ArrowUpDown, Plus, Trash2, Pencil, ClipboardCheck } from "lucide-react";
 import * as XLSX from "xlsx";
 import { AlertModal } from "@/components/modals/AlertModal";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
@@ -68,7 +68,7 @@ function LogActionBadge({ action }: { action: string }) {
         "Delete": "bg-red-50 text-red-700 ring-red-600/20",
         "Check-in": "bg-sky-50 text-sky-700 ring-sky-600/20",
         "Check-out": "bg-amber-50 text-amber-700 ring-amber-600/20",
-        "Dispose": "bg-slate-50 text-slate-700 ring-slate-600/20",
+        "Dispose": "bg-rose-50 text-rose-700 ring-rose-600/20",
         "Audit": "bg-violet-50 text-violet-700 ring-violet-600/20",
         "Import": "bg-blue-50 text-blue-700 ring-blue-600/20",
     };
@@ -121,7 +121,15 @@ export default function LogsPage() {
                 log.computerNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 log.adminUser.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 log.details?.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesAction = actionFilter === "All" || log.action === actionFilter;
+            const matchesAction =
+                actionFilter === "All" ||
+                (actionFilter === "Check-in / Check-out"
+                    ? (log.action === "Check-in" || log.action === "Check-out")
+                    : actionFilter === "Deleted"
+                        ? log.action === "Delete"
+                        : actionFilter === "Disposed"
+                            ? log.action === "Dispose"
+                            : log.action === actionFilter);
 
             let matchesDate = true;
             if (startDate || endDate) {
@@ -188,13 +196,6 @@ export default function LogsPage() {
                     <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Activity Logs</h1>
                     <p className="text-sm text-slate-500 mt-1">Track and audit all asset movements and changes.</p>
                 </div>
-                <button
-                    onClick={handleExport}
-                    className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
-                >
-                    <Upload className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" />
-                    <span>Export Report</span>
-                </button>
             </div>
 
             {/* Filters */}
@@ -205,7 +206,7 @@ export default function LogsPage() {
             >
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-12 md:gap-6">
                     {/* Search */}
-                    <div className="md:col-span-4 relative">
+                    <div className="md:col-span-6 lg:col-span-5 relative">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         <input
                             type="text"
@@ -216,52 +217,30 @@ export default function LogsPage() {
                         />
                     </div>
 
-                    {/* Action Filter */}
-                    <div className="md:col-span-3 relative">
-                        <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        <select
-                            value={actionFilter}
-                            onChange={(e) => setActionFilter(e.target.value)}
-                            className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-8 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer"
-                        >
-                            <option value="All">All Actions</option>
-                            <option value="Add">Add Asset</option>
-                            <option value="Update">Update Asset</option>
-                            <option value="Delete">Delete Asset</option>
-                            <option value="Check-in">Check-in</option>
-                            <option value="Check-out">Check-out</option>
-                            <option value="Dispose">Dispose</option>
-                            <option value="Audit">Audit</option>
-                            <option value="Import">Bulk Import</option>
-                        </select>
-                        <ArrowUpDown className="absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400 pointer-events-none opacity-50" />
-                    </div>
-
-                    {/* Date Range */}
-                    {/* Date Range */}
-                    <div className="md:col-span-12 lg:col-span-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                        <div className="relative flex-1">
+                    {/* Date Range & Export */}
+                    <div className="hidden md:flex md:col-span-6 lg:col-span-7 flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div className="relative flex-1 min-w-0">
                             <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
                             <input
                                 type="date"
                                 value={startDate}
                                 max={endDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none min-w-[130px]"
-                                placeholder="Start Date" // Note: placeholder doesn't always show for date inputs in all browsers
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
+                                placeholder="From"
                                 aria-label="Start Date"
                             />
                         </div>
                         <span className="text-slate-400 text-sm font-medium text-center hidden sm:block">to</span>
-                        <div className="relative flex-1">
+                        <div className="relative flex-1 min-w-0">
                             <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
                             <input
                                 type="date"
                                 value={endDate}
                                 min={startDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none min-w-[130px]"
-                                placeholder="End Date"
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
+                                placeholder="To"
                                 aria-label="End Date"
                             />
                         </div>
@@ -275,13 +254,73 @@ export default function LogsPage() {
                                 <span className="sm:hidden ml-2 text-sm font-medium">Clear Dates</span>
                             </button>
                         )}
+                        <button
+                            onClick={handleExport}
+                            className="md:hidden flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all active:scale-95 sm:w-auto"
+                        >
+                            <Upload className="h-4 w-4" />
+                            <span>Export</span>
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            className="hidden md:flex group items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                            <Upload className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" />
+                            <span>Export Report</span>
+                        </button>
+                    </div>
+
+                    {/* Action Tabs - Desktop & Mobile (Refined) */}
+                    <div className="md:col-span-12 lg:col-span-12">
+                        <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0 scrollbar-hide">
+                            <div className="flex items-center gap-1.5 min-w-max bg-slate-100/50 p-1.5 rounded-xl border border-slate-200/60">
+                                {[
+                                    { id: "All", label: "All", icon: Filter },
+                                    { id: "Add", label: "Add", icon: Plus },
+                                    { id: "Deleted", label: "Deleted", icon: Trash2 },
+                                    { id: "Update", label: "Update", icon: Pencil },
+                                    { id: "Check-in / Check-out", label: "Check-in/Out", icon: ArrowUpDown },
+                                    { id: "Disposed", label: "Disposed", icon: Trash2 },
+                                    { id: "Audit", label: "Audit", icon: ClipboardCheck },
+                                    { id: "Import", label: "Import", icon: Upload },
+                                ].map((tab) => {
+                                    const isActive = actionFilter === tab.id;
+                                    const Icon = tab.icon;
+
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setActionFilter(tab.id)}
+                                            className={`
+                                                relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap z-10
+                                                ${isActive ? "text-blue-700" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"}
+                                            `}
+                                        >
+                                            {isActive && (
+                                                <motion.div
+                                                    layoutId="activeTab"
+                                                    className="absolute inset-0 bg-white rounded-lg shadow-sm border border-slate-200/60 -z-10"
+                                                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                                />
+                                            )}
+                                            <Icon className={`w-3.5 h-3.5 ${isActive ? "text-blue-600" : "text-slate-400"}`} />
+                                            <span>{tab.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </motion.div>
+
+
+
+            </motion.div >
 
             {/* Table */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
+            < motion.div
+                initial={{ opacity: 0, y: 20 }
+                }
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
                 className="hidden md:block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
@@ -392,35 +431,37 @@ export default function LogsPage() {
                         </tbody>
                     </table>
                 </div>
-            </motion.div>
+            </motion.div >
 
             {/* Mobile List View (Optimized) */}
-            <div className="md:hidden space-y-4">
-                {filteredLogs.map((log) => {
-                    const { date, time } = formatDateSafe(log.timestamp);
-                    return (
-                        <div key={log.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <div className="flex items-center justify-between mb-3">
-                                <LogActionBadge action={log.action} />
-                                <span className="text-xs text-slate-400 font-mono">{date} {time}</span>
-                            </div>
-                            <div className="flex items-center gap-3 mb-3">
-                                <InitialsAvatar name={log.adminUser} />
-                                <div>
-                                    <p className="text-sm font-semibold text-slate-900">{log.adminUser}</p>
-                                    <p className="text-xs text-slate-500">Action performed on <span className="font-mono bg-slate-100 px-1 rounded">{log.computerNo}</span></p>
+            < div className="md:hidden space-y-4" >
+                {
+                    filteredLogs.map((log) => {
+                        const { date, time } = formatDateSafe(log.timestamp);
+                        return (
+                            <div key={log.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                    <LogActionBadge action={log.action} />
+                                    <span className="text-xs text-slate-400 font-mono">{date} {time}</span>
                                 </div>
-                            </div>
-                            {log.details && (
-                                <div className="mt-2 pt-2 border-t border-slate-100">
-                                    <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Details</p>
-                                    <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded-lg">{log.details}</p>
+                                <div className="flex items-center gap-3 mb-3">
+                                    <InitialsAvatar name={log.adminUser} />
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-900">{log.adminUser}</p>
+                                        <p className="text-xs text-slate-500">Action performed on <span className="font-mono bg-slate-100 px-1 rounded">{log.computerNo}</span></p>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
+                                {log.details && (
+                                    <div className="mt-2 pt-2 border-t border-slate-100">
+                                        <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Details</p>
+                                        <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded-lg">{log.details}</p>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })
+                }
+            </div >
+        </div >
     );
 }

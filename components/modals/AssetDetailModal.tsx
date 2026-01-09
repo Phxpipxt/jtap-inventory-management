@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Asset } from "@/lib/types";
-import { X, Download, Maximize2, Tag, Calendar, User, Building, Hash, Cpu, HardDrive, Pencil, History as HistoryIcon } from "lucide-react";
+import { X, Download, Maximize2, Tag, Calendar, User, Building, Hash, Cpu, HardDrive, Pencil, History as HistoryIcon, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface AssetDetailModalProps {
@@ -11,10 +11,62 @@ interface AssetDetailModalProps {
     onClose: () => void;
     onEdit?: () => void;
     onHistory?: () => void;
+    onUpdate?: (asset: Asset, action: "Update", details: string) => Promise<void>;
 }
 
-export function AssetDetailModal({ asset, isOpen, onClose, onEdit, onHistory }: AssetDetailModalProps) {
+export function AssetDetailModal({ asset, isOpen, onClose, onEdit, onHistory, onUpdate }: AssetDetailModalProps) {
     const [expandedImage, setExpandedImage] = useState<string | null>(null);
+    const [isEditingCondition, setIsEditingCondition] = useState(false);
+    const [editCondition, setEditCondition] = useState<string>(asset.condition || "Working");
+    const [editIssues, setEditIssues] = useState<string>(asset.issues || "");
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Sync state when asset changes or modal opens
+    // Note: We use a key on the modal or useEffect to reset, but since the modal stays mounted/unmounted via AnimatePresence, 
+    // we should ensure it resets when `asset` changes or `isOpen` becomes true.
+    // However, `key="modal-content"` doesn't force re-render on prop change. 
+    // We can rely on simple init or useEffect.
+    /*
+    useEffect(() => {
+        if (isOpen) {
+             setEditCondition(asset.condition || "Working");
+             setEditIssues(asset.issues || "");
+             setIsEditingCondition(false);
+        }
+    }, [isOpen, asset]);
+    */
+    // Better: Initialize in the edit button click
+
+    const handleStartEdit = () => {
+        setEditCondition(asset.condition || "Working");
+        setEditIssues(asset.issues || "");
+        setIsEditingCondition(true);
+    };
+
+    const handleSaveCondition = async () => {
+        if (!onUpdate) return;
+        setIsSaving(true);
+        try {
+            const updatedAsset: Asset = {
+                ...asset,
+                condition: editCondition,
+                issues: editCondition === "Working" ? null : editIssues
+            };
+
+            const changes = [];
+            if (asset.condition !== editCondition) changes.push(`Condition changed from ${asset.condition || "None"} to ${editCondition}`);
+            if (editCondition === "Not Working" && asset.issues !== editIssues) changes.push(`Issues updated`);
+
+            const logDetails = changes.length > 0 ? changes.join(", ") : "Condition updated";
+
+            await onUpdate(updatedAsset, "Update", logDetails);
+            setIsEditingCondition(false);
+        } catch (error) {
+            console.error("Failed to update condition", error);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const handleDownload = (imageUrl: string, fileName: string) => {
         const link = document.createElement("a");
@@ -60,6 +112,14 @@ export function AssetDetailModal({ asset, isOpen, onClose, onEdit, onHistory }: 
                                             }`}>
                                             {asset.status}
                                         </span>
+                                        {asset.condition && (
+                                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${asset.condition === "Working"
+                                                ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
+                                                : "bg-amber-50 text-amber-700 ring-amber-600/20"
+                                                }`}>
+                                                {asset.condition}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                                 <button
@@ -76,6 +136,53 @@ export function AssetDetailModal({ asset, isOpen, onClose, onEdit, onHistory }: 
 
                                     {/* Left Column: Images & Key Specs */}
                                     <div className="space-y-6">
+                                        {/* Identification (Moved to Top Left) */}
+                                        <section>
+                                            <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide opacity-75 mb-4 border-b border-slate-100 pb-2">Identification</h3>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-4">
+                                                <div className="sm:col-span-2">
+                                                    <span className="text-xs font-medium text-slate-500 block mb-1">Computer Number</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono text-xl sm:text-2xl font-bold text-slate-800 tracking-tight break-all">
+                                                            {asset.computerNo}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span className="text-xs font-medium text-slate-500 block mb-1">Serial Number</span>
+                                                    <p className="text-sm font-mono text-slate-800 break-all">{asset.serialNo}</p>
+                                                </div>
+                                                <div>
+                                                    <span className="text-xs font-medium text-slate-500 block mb-1">Brand & Model</span>
+                                                    <p className="text-sm font-medium text-slate-800">{asset.brand || "-"} {asset.model}</p>
+                                                </div>
+
+                                                {/* Reordered: Current Owner -> Employee ID -> Assigned Department */}
+                                                <div>
+                                                    <span className="text-xs font-medium text-slate-500 block mb-1">Current Owner</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                        <p className="text-sm text-slate-800 break-words">{asset.owner || "None"}</p>
+                                                    </div>
+                                                </div>
+
+                                                {asset.empId && (
+                                                    <div>
+                                                        <span className="text-xs font-medium text-slate-500 block mb-1">Employee ID</span>
+                                                        <p className="text-sm font-mono text-slate-800 break-all">{asset.empId}</p>
+                                                    </div>
+                                                )}
+
+                                                <div>
+                                                    <span className="text-xs font-medium text-slate-500 block mb-1">Assigned Department</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                        <p className="text-sm text-slate-800">{asset.department || "Unassigned"}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </section>
+
                                         {/* Images Gallery */}
                                         {(asset.images?.length || asset.image) && (
                                             <div className="space-y-3">
@@ -149,54 +256,134 @@ export function AssetDetailModal({ asset, isOpen, onClose, onEdit, onHistory }: 
                                     {/* Right Column: Detailed Info */}
                                     <div className="space-y-8">
 
-                                        {/* General Info */}
-                                        <section>
-                                            <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide opacity-75 mb-4 border-b border-slate-100 pb-2">Identification</h3>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-4">
-                                                <div className="sm:col-span-2">
-                                                    <span className="text-xs font-medium text-slate-500 block mb-1">Computer Number</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-mono text-xl sm:text-2xl font-bold text-slate-800 tracking-tight break-all">
-                                                            {asset.computerNo}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <span className="text-xs font-medium text-slate-500 block mb-1">Serial Number</span>
-                                                    <p className="text-sm font-mono text-slate-800 break-all">{asset.serialNo}</p>
-                                                </div>
-                                                <div>
-                                                    <span className="text-xs font-medium text-slate-500 block mb-1">Brand & Model</span>
-                                                    <p className="text-sm font-medium text-slate-800">{asset.brand || "-"} {asset.model}</p>
+                                        {/* Condition Report (Moved & Enhanced) */}
+                                        {(asset.condition || asset.status === "Disposed" || onUpdate) && (
+                                            <section>
+                                                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                                                    <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide opacity-75">Condition Report</h3>
+                                                    {onUpdate && !isEditingCondition && (
+                                                        <button
+                                                            onClick={handleStartEdit}
+                                                            className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 cursor-pointer"
+                                                        >
+                                                            <Pencil className="w-3 h-3" />
+                                                            Edit
+                                                        </button>
+                                                    )}
                                                 </div>
 
-                                                {/* Reordered: Current Owner -> Employee ID -> Assigned Department */}
-                                                <div>
-                                                    <span className="text-xs font-medium text-slate-500 block mb-1">Current Owner</span>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                                        <p className="text-sm text-slate-800 break-words">{asset.owner || "None"}</p>
-                                                    </div>
-                                                </div>
+                                                {isEditingCondition ? (
+                                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                                                        <div>
+                                                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Condition</label>
+                                                            <select
+                                                                className="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+                                                                value={editCondition}
+                                                                onChange={(e) => setEditCondition(e.target.value)}
+                                                            >
+                                                                <option value="Working">Working</option>
+                                                                <option value="Not Working">Not Working</option>
+                                                            </select>
+                                                        </div>
 
-                                                {asset.empId && (
-                                                    <div>
-                                                        <span className="text-xs font-medium text-slate-500 block mb-1">Employee ID</span>
-                                                        <p className="text-sm font-mono text-slate-800 break-all">{asset.empId}</p>
+                                                        {editCondition === "Not Working" && (
+                                                            <div>
+                                                                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Issues</label>
+                                                                <textarea
+                                                                    className="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+                                                                    rows={3}
+                                                                    value={editIssues}
+                                                                    onChange={(e) => setEditIssues(e.target.value)}
+                                                                    placeholder="Describe the issues..."
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        <div className="flex justify-end gap-2 pt-2">
+                                                            <button
+                                                                onClick={() => setIsEditingCondition(false)}
+                                                                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                                                                disabled={isSaving}
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button
+                                                                onClick={handleSaveCondition}
+                                                                className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                                                disabled={isSaving}
+                                                            >
+                                                                {isSaving ? "Saving..." : "Save Changes"}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className={`relative overflow-hidden rounded-2xl border p-6 transition-all shadow-sm group ${asset.condition === 'Working'
+                                                        ? 'bg-gradient-to-br from-emerald-50 via-teal-50 to-white border-emerald-100'
+                                                        : asset.condition === 'Not Working'
+                                                            ? 'bg-gradient-to-br from-amber-50 via-orange-50 to-white border-amber-100'
+                                                            : 'bg-slate-50 border-slate-200'
+                                                        }`}>
+
+                                                        {/* Decorative Elements */}
+                                                        <div className={`absolute -right-8 -top-8 w-32 h-32 rounded-full blur-3xl opacity-60 pointer-events-none transition-opacity group-hover:opacity-80 ${asset.condition === 'Working' ? 'bg-emerald-300'
+                                                            : asset.condition === 'Not Working' ? 'bg-amber-300'
+                                                                : 'bg-slate-300'
+                                                            }`} />
+
+                                                        <div className="relative flex items-center gap-5">
+                                                            <div className={`p-4 rounded-2xl shadow-md flex-shrink-0 ${asset.condition === 'Working'
+                                                                ? 'bg-white text-emerald-600 ring-4 ring-emerald-500/10'
+                                                                : asset.condition === 'Not Working'
+                                                                    ? 'bg-white text-amber-600 ring-4 ring-amber-500/10'
+                                                                    : 'bg-white text-slate-500 ring-4 ring-slate-100'
+                                                                }`}>
+                                                                {asset.condition === 'Working' ? (
+                                                                    <CheckCircle2 className="w-8 h-8" />
+                                                                ) : asset.condition === 'Not Working' ? (
+                                                                    <AlertTriangle className="w-8 h-8" />
+                                                                ) : (
+                                                                    <Tag className="w-8 h-8" />
+                                                                )}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center justify-between mb-1">
+                                                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Current Status</span>
+                                                                    <span className="text-xs text-slate-400 font-medium">
+                                                                        {new Date(asset.lastUpdated).toLocaleDateString()}
+                                                                    </span>
+                                                                </div>
+                                                                <div className={`text-2xl font-black tracking-tight ${asset.condition === 'Working' ? 'text-emerald-950' : 'text-amber-950'}`}>
+                                                                    {asset.condition || "Not Specified"}
+                                                                </div>
+                                                                <p className="text-sm text-slate-500 truncate mt-1">
+                                                                    {asset.condition === 'Working' ? "Asset is fully operational" : "Asset requires attention"}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        {asset.condition === 'Not Working' && (asset.issues || (asset.remarks && asset.remarks.startsWith("Issue: "))) && (
+                                                            <motion.div
+                                                                initial={{ opacity: 0, height: 0 }}
+                                                                animate={{ opacity: 1, height: "auto" }}
+                                                                className="mt-5 pt-4 border-t border-amber-200/50"
+                                                            >
+                                                                <span className="text-xs font-bold text-amber-800/70 block mb-2 flex items-center gap-1.5">
+                                                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                                                    REPORTED ISSUE
+                                                                </span>
+                                                                <p className="text-sm font-medium text-amber-900 bg-white/60 backdrop-blur-sm p-3 rounded-xl border border-amber-100/50 shadow-sm">
+                                                                    {asset.issues || (asset.remarks?.startsWith("Issue: ") ? asset.remarks.replace("Issue: ", "") : asset.remarks)}
+                                                                </p>
+                                                            </motion.div>
+                                                        )}
                                                     </div>
                                                 )}
+                                            </section>
+                                        )}
 
-                                                <div>
-                                                    <span className="text-xs font-medium text-slate-500 block mb-1">Assigned Department</span>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                                        <p className="text-sm text-slate-800">{asset.department || "Unassigned"}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </section>
 
-                                        {/* Dates */}
+
+                                        {/* Dates (Restored) */}
                                         <section>
                                             <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide opacity-75 mb-4 border-b border-slate-100 pb-2">Timeline</h3>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -230,7 +417,7 @@ export function AssetDetailModal({ asset, isOpen, onClose, onEdit, onHistory }: 
                                             </div>
                                         </section>
 
-                                        {/* Other */}
+                                        {/* Metadata (Restored) */}
                                         <section>
                                             <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide opacity-75 mb-4 border-b border-slate-100 pb-2">Metadata</h3>
                                             <div className="space-y-4">
