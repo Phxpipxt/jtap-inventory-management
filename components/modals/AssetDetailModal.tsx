@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Asset } from "@/lib/types";
+import { useInventoryContext } from "@/context/InventoryContext"; // Import context
 import { X, Download, Maximize2, Tag, Calendar, User, Building, Hash, Cpu, HardDrive, Pencil, History as HistoryIcon, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -20,6 +21,32 @@ export function AssetDetailModal({ asset, isOpen, onClose, onEdit, onHistory, on
     const [editCondition, setEditCondition] = useState<string>(asset.condition || "Working");
     const [editIssues, setEditIssues] = useState<string>(asset.issues || "");
     const [isSaving, setIsSaving] = useState(false);
+
+    // New state for fetching full details (images)
+    const { getAssetDetails } = useInventoryContext();
+    const [fetchedImages, setFetchedImages] = useState<string[]>(asset.images || []);
+    const [isLoadingImages, setIsLoadingImages] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && (!asset.images || asset.images.length === 0)) {
+            const fetchDetails = async () => {
+                setIsLoadingImages(true);
+                try {
+                    const detailedAsset = await getAssetDetails(asset.id);
+                    if (detailedAsset && detailedAsset.images) {
+                        setFetchedImages(detailedAsset.images);
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch asset details", error);
+                } finally {
+                    setIsLoadingImages(false);
+                }
+            };
+            fetchDetails();
+        } else if (isOpen && asset.images) {
+            setFetchedImages(asset.images);
+        }
+    }, [isOpen, asset, getAssetDetails]);
 
     // Sync state when asset changes or modal opens
     // Note: We use a key on the modal or useEffect to reset, but since the modal stays mounted/unmounted via AnimatePresence, 
@@ -184,15 +211,15 @@ export function AssetDetailModal({ asset, isOpen, onClose, onEdit, onHistory, on
                                         </section>
 
                                         {/* Images Gallery */}
-                                        {(asset.images?.length || asset.image) && (
+                                        {(fetchedImages.length > 0 || asset.image) && (
                                             <div className="space-y-3">
                                                 <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide opacity-75">Asset Image</h3>
                                                 <div className="grid grid-cols-2 gap-3">
-                                                    {(asset.images && asset.images.length > 0 ? asset.images : (asset.image ? [asset.image] : [])).map((img, index) => (
+                                                    {(fetchedImages.length > 0 ? fetchedImages : (asset.image ? [asset.image] : [])).map((img, index) => (
                                                         <motion.div
                                                             key={index}
                                                             layoutId={`image-${index}`}
-                                                            className={`relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 group cursor-zoom-in ${index === 0 && (asset.images?.length || 0) % 2 !== 0 ? 'col-span-2 aspect-video' : 'aspect-square'
+                                                            className={`relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 group cursor-zoom-in ${index === 0 && (fetchedImages.length || 0) % 2 !== 0 ? 'col-span-2 aspect-video' : 'aspect-square'
                                                                 }`}
                                                             onClick={() => setExpandedImage(img)}
                                                         >

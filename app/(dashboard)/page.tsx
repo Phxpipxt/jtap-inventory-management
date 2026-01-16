@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useInventory } from "@/hooks/useInventory";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { Package, CheckCircle, User, History, Clock, FileText, Repeat } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// Removed static imports for lazy loading
+// import jsPDF from "jspdf";
+// import autoTable from "jspdf-autotable";
 import { motion } from "framer-motion";
 
 export default function DashboardPage() {
@@ -53,7 +54,10 @@ export default function DashboardPage() {
         return diffDays > 0 && diffDays <= 30;
     }).length;
 
-    const handleExportPDF = () => {
+    const handleExportPDF = async () => {
+        const jsPDF = (await import("jspdf")).default;
+        const autoTable = (await import("jspdf-autotable")).default;
+
         const doc = new jsPDF();
         doc.text("Inventory Asset Report", 14, 15);
         doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);

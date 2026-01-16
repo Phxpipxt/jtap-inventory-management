@@ -11,7 +11,8 @@ import {
     deleteAssets as deleteAssetsAction,
     createLog,
     createLogs,
-    saveAuditLog as saveAuditLogAction
+    saveAuditLog as saveAuditLogAction,
+    getAssetDetails as getAssetDetailsAction
 } from "@/lib/actions";
 
 interface InventoryContextType {
@@ -28,6 +29,7 @@ interface InventoryContextType {
     deleteAssets: (assetIds: string[], adminUser: string, reason?: string) => Promise<void>;
     saveAuditLog: (log: AuditLog) => Promise<void>;
     verifyAuditLog: (logId: string, verifier: string, step: 1 | 2) => Promise<void>;
+    getAssetDetails: (id: string) => Promise<Asset | null>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -426,6 +428,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         await saveAuditLogMutation.mutateAsync(updatedLog);
     };
 
+    const getAssetDetails = async (id: string) => {
+        return await getAssetDetailsAction(id);
+    };
+
     const value = React.useMemo(() => ({
         assets,
         logs,
@@ -439,7 +445,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         deleteAsset,
         deleteAssets,
         saveAuditLog,
-        verifyAuditLog
+        verifyAuditLog,
+        getAssetDetails
     }), [assets, logs, auditLogs, loading, logsLoading, auditLogsLoading, addAssetMutation, addAssetsBatchMutation, updateAssetMutation, deleteAssetMutation, saveAuditLogMutation]);
 
     return (

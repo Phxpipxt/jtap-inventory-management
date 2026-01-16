@@ -8,9 +8,9 @@ import { revalidatePath } from "next/cache";
 
 export async function getAssets(): Promise<Asset[]> {
     const assets = await prisma.asset.findMany({
-        include: {
-            images: true,
-        },
+        // include: {
+        //     images: false, // Performance: Do not fetch images by default
+        // },
     });
 
     return assets.map((a) => ({
@@ -26,13 +26,46 @@ export async function getAssets(): Promise<Asset[]> {
         hdd: a.hdd || undefined,
         ram: a.ram || undefined,
         cpu: a.cpu || undefined,
-        images: a.images.map((img) => img.data),
+        images: [], // Images now fetched on demand
+        // images: a.images.map((img) => img.data),
         purchaseDate: a.purchaseDate ? a.purchaseDate.toISOString() : undefined,
         warrantyExpiry: a.warrantyExpiry ? a.warrantyExpiry.toISOString() : undefined,
         distributionDate: a.distributionDate ? a.distributionDate.toISOString() : undefined,
         lastUpdated: a.lastUpdated.toISOString(),
         tags: a.tags,
     }));
+}
+
+export async function getAssetDetails(id: string): Promise<Asset | null> {
+    const asset = await prisma.asset.findUnique({
+        where: { id },
+        include: {
+            images: true,
+        },
+    });
+
+    if (!asset) return null;
+
+    return {
+        ...asset,
+        status: asset.status as AssetStatus,
+        department: asset.department as Department | null,
+        brand: asset.brand || undefined,
+        model: asset.model || undefined,
+        owner: asset.owner || undefined,
+        empId: asset.empId || undefined,
+        remarks: asset.remarks || undefined,
+        issues: asset.issues || undefined,
+        hdd: asset.hdd || undefined,
+        ram: asset.ram || undefined,
+        cpu: asset.cpu || undefined,
+        images: asset.images.map((img) => img.data),
+        purchaseDate: asset.purchaseDate ? asset.purchaseDate.toISOString() : undefined,
+        warrantyExpiry: asset.warrantyExpiry ? asset.warrantyExpiry.toISOString() : undefined,
+        distributionDate: asset.distributionDate ? asset.distributionDate.toISOString() : undefined,
+        lastUpdated: asset.lastUpdated.toISOString(),
+        tags: asset.tags,
+    };
 }
 
 export async function createAsset(asset: Asset, adminUser: string, log?: LogEntry) {

@@ -5,7 +5,7 @@ import { useInventory } from "@/hooks/useInventory";
 import { useAuth } from "@/context/AuthContext";
 import { Upload, Calendar, X, Eye, CheckCircle, AlertCircle, Printer, FileSpreadsheet, History, Download } from "lucide-react";
 import { motion } from "framer-motion";
-import * as XLSX from "xlsx";
+// import * as XLSX from "xlsx";
 import { useReactToPrint } from "react-to-print";
 import { AlertModal } from "@/components/modals/AlertModal";
 import { AuditDetailModal } from "@/components/modals/AuditDetailModal";
@@ -90,13 +90,14 @@ export default function AuditHistoryPage() {
         return true;
     });
 
-    const handleExportHistory = () => {
+    const handleExportHistory = async () => {
         if (filteredLogs.length === 0) {
             showAlert("No Data", "No audit history to export.", "warning");
             return;
         }
 
         try {
+            const XLSX = await import("xlsx");
             const data = filteredLogs.map(log => ({
                 Date: new Date(log.date).toLocaleString(),
                 "Total Assets": log.totalAssets,
@@ -127,7 +128,7 @@ export default function AuditHistoryPage() {
         }
     };
 
-    const handleExportLog = (log: AuditLog) => {
+    const handleExportLog = async (log: AuditLog) => {
         try {
             const foundAssets = assets.filter(a => log.scannedIds.includes(a.id));
             const missingAssets = log.missingIds
@@ -135,6 +136,7 @@ export default function AuditHistoryPage() {
                 : [];
 
             // Create workbook
+            const XLSX = await import("xlsx");
             const wb = XLSX.utils.book_new();
 
             // 1. Summary Sheet

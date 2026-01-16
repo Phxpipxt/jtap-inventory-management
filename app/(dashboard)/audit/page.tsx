@@ -555,7 +555,11 @@ export default function AuditPage() {
                                 <div key={asset.id} className="p-4 bg-white hover:bg-rose-50/30 transition-colors">
                                     <div className="flex justify-between items-start mb-1">
                                         <div className="font-bold text-slate-900">{asset.computerNo}</div>
-                                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border ${asset.status === "In Stock" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                                asset.status === "Assigned" || asset.status === "In Use" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                                    asset.status === "Broken" || asset.status === "Resign" ? "bg-red-50 text-red-700 border-red-200" :
+                                                        "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                            }`}>
                                             {asset.status}
                                         </span>
                                     </div>
@@ -586,8 +590,12 @@ export default function AuditPage() {
                                             <div className="text-xs text-slate-400">{asset.department || "No Dept"}</div>
                                         </td>
                                         <td className="px-6 py-3">
-                                            <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 border border-slate-200">
-                                                Pending
+                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold border ${asset.status === "In Stock" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                                asset.status === "Assigned" || asset.status === "In Use" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                                    asset.status === "Broken" || asset.status === "Resign" ? "bg-red-50 text-red-700 border-red-200" :
+                                                        "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                                }`}>
+                                                {asset.status}
                                             </span>
                                         </td>
                                     </tr>

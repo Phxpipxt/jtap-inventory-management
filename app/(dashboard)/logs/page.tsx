@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useInventory } from "@/hooks/useInventory";
 import { Search, Filter, Upload, Calendar, X, FileText, User, ArrowUpDown, Plus, Trash2, Pencil, ClipboardCheck } from "lucide-react";
-import * as XLSX from "xlsx";
+// import * as XLSX from "xlsx";
 import { AlertModal } from "@/components/modals/AlertModal";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
 import { LogEntry } from "@/lib/types";
@@ -155,13 +155,14 @@ export default function LogsPage() {
         });
     }, [logs, searchTerm, actionFilter, startDate, endDate]);
 
-    const handleExport = () => {
+    const handleExport = async () => {
         if (filteredLogs.length === 0) {
             showAlert("No Data", "No logs to export.", "warning");
             return;
         }
 
         try {
+            const XLSX = await import("xlsx");
             const data = filteredLogs.map(log => ({
                 "Date": new Date(log.timestamp).toLocaleString(),
                 "Action": log.action,
