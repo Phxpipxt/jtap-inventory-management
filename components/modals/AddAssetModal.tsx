@@ -354,7 +354,7 @@ export function AddAssetModal({ isOpen, onClose, onAdd }: AddAssetModalProps) {
                                 </div>
                                 <button
                                     onClick={onClose}
-                                    className="rounded-full p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                                    className="rounded-full p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors cursor-pointer"
                                 >
                                     <X className="h-5 w-5" />
                                 </button>
@@ -417,7 +417,7 @@ export function AddAssetModal({ isOpen, onClose, onAdd }: AddAssetModalProps) {
                                                     <button
                                                         type="button"
                                                         onClick={() => { setScanTarget("computerNo"); setIsScanning(true); }}
-                                                        className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-200 transition-all"
+                                                        className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-200 transition-all cursor-pointer"
                                                         title="Scan Barcode"
                                                     >
                                                         <ScanBarcode className="h-5 w-5" />
@@ -439,7 +439,7 @@ export function AddAssetModal({ isOpen, onClose, onAdd }: AddAssetModalProps) {
                                                     <button
                                                         type="button"
                                                         onClick={() => { setScanTarget("serialNo"); setIsScanning(true); }}
-                                                        className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-200 transition-all"
+                                                        className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-200 transition-all cursor-pointer"
                                                         title="Scan Serial"
                                                     >
                                                         <ScanBarcode className="h-5 w-5" />
@@ -582,7 +582,7 @@ export function AddAssetModal({ isOpen, onClose, onAdd }: AddAssetModalProps) {
                                                     <button
                                                         type="button"
                                                         onClick={() => removeImage(index)}
-                                                        className="absolute right-2 top-2 rounded-full bg-red-500/90 p-1.5 text-white opacity-0 backdrop-blur-sm transition-all hover:bg-red-600 group-hover:opacity-100"
+                                                        className="absolute right-2 top-2 rounded-full bg-red-500/90 p-1.5 text-white opacity-0 backdrop-blur-sm transition-all hover:bg-red-600 group-hover:opacity-100 cursor-pointer"
                                                     >
                                                         <X className="h-3 w-3" />
                                                     </button>
@@ -632,7 +632,7 @@ export function AddAssetModal({ isOpen, onClose, onAdd }: AddAssetModalProps) {
                                     <button
                                         type="button"
                                         onClick={onClose}
-                                        className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                                     >
                                         Cancel
                                     </button>
@@ -640,7 +640,7 @@ export function AddAssetModal({ isOpen, onClose, onAdd }: AddAssetModalProps) {
                                         type="submit"
                                         form="add-asset-form"
                                         disabled={loading}
-                                        className="flex-[2] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="flex-[2] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                     >
                                         {loading ? (
                                             <span className="animate-pulse">Processing...</span>

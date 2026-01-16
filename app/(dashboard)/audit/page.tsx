@@ -293,7 +293,7 @@ export default function AuditPage() {
                 {auditStatus === "Idle" || auditStatus === "Completed" ? (
                     <button
                         onClick={handleStartClick}
-                        className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-500/20 transition-all hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98]"
+                        className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-500/20 transition-all hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                     >
                         <ScanBarcode className="h-4 w-4 transition-transform group-hover:scale-110" />
                         <span>Start New Audit</span>
@@ -312,14 +312,14 @@ export default function AuditPage() {
                         <div className="grid grid-cols-2 gap-3 w-full md:w-auto md:flex md:items-center">
                             <button
                                 onClick={handleCancelAuditClick}
-                                className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-100 transition-colors shadow-sm active:scale-95"
+                                className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-100 transition-colors shadow-sm active:scale-95 cursor-pointer"
                             >
                                 <X className="h-4 w-4" />
                                 <span>Cancel</span>
                             </button>
                             <button
                                 onClick={handleStopAuditClick}
-                                className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
+                                className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                             >
                                 <CheckCircle className="h-4 w-4" />
                                 <span className="whitespace-nowrap">Finish & Save</span>
@@ -500,7 +500,7 @@ export default function AuditPage() {
                             <thead className="bg-slate-50/80 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 sticky top-0 z-10">
                                 <tr>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Asset</th>
-                                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Details</th>
+                                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Model / Brand</th>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Status</th>
                                 </tr>
                             </thead>
@@ -512,8 +512,9 @@ export default function AuditPage() {
                                             <div className="text-xs text-slate-500 font-mono">{asset.serialNo}</div>
                                         </td>
                                         <td className="px-6 py-3">
-                                            <div className="text-sm text-slate-700">{asset.brand} {asset.model}</div>
-                                            <div className="text-xs text-slate-400">{asset.department || "No Dept"}</div>
+                                            <div className="text-sm text-slate-700 font-medium">
+                                                {[asset.brand, asset.model].filter(Boolean).join(" ") || "-"}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-3">
                                             <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-600/10">
@@ -556,9 +557,9 @@ export default function AuditPage() {
                                     <div className="flex justify-between items-start mb-1">
                                         <div className="font-bold text-slate-900">{asset.computerNo}</div>
                                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border ${asset.status === "In Stock" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                                                asset.status === "Assigned" || asset.status === "In Use" ? "bg-blue-50 text-blue-700 border-blue-200" :
-                                                    asset.status === "Broken" || asset.status === "Resign" ? "bg-red-50 text-red-700 border-red-200" :
-                                                        "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                            asset.status === "Assigned" || asset.status === "In Use" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                                asset.status === "Broken" || asset.status === "Resign" ? "bg-red-50 text-red-700 border-red-200" :
+                                                    "bg-yellow-50 text-yellow-700 border-yellow-200"
                                             }`}>
                                             {asset.status}
                                         </span>
@@ -574,7 +575,7 @@ export default function AuditPage() {
                             <thead className="bg-slate-50/80 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 sticky top-0 z-10">
                                 <tr>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Asset</th>
-                                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Details</th>
+                                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Model / Brand</th>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Status</th>
                                 </tr>
                             </thead>
@@ -586,8 +587,9 @@ export default function AuditPage() {
                                             <div className="text-xs text-slate-500 font-mono">{asset.serialNo}</div>
                                         </td>
                                         <td className="px-6 py-3">
-                                            <div className="text-sm text-slate-700">{asset.brand} {asset.model}</div>
-                                            <div className="text-xs text-slate-400">{asset.department || "No Dept"}</div>
+                                            <div className="text-sm text-slate-700 font-medium">
+                                                {[asset.brand, asset.model].filter(Boolean).join(" ") || "-"}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-3">
                                             <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold border ${asset.status === "In Stock" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :

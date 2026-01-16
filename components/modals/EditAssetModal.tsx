@@ -295,7 +295,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
                             </div>
                             <button
                                 onClick={onClose}
-                                className="rounded-full p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                                className="rounded-full p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors cursor-pointer"
                             >
                                 <X className="h-5 w-5" />
                             </button>
@@ -362,7 +362,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
                                                 <select
                                                     value={brand}
                                                     onChange={(e) => setBrand(e.target.value)}
-                                                    className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                                                    className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer"
                                                 >
                                                     <option value="">Select Brand</option>
                                                     {BRANDS.map((b) => (
@@ -421,7 +421,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
                                             <select
                                                 value={status}
                                                 onChange={(e) => setStatus(e.target.value as Asset["status"])}
-                                                className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                                                className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer"
                                             >
                                                 <option value="In Stock">In Stock</option>
                                                 <option value="In Use">In Use</option>
@@ -581,14 +581,14 @@ export function EditAssetModal({ asset, isOpen, onClose, onSave }: EditAssetModa
                             <div className="flex gap-3">
                                 <button
                                     onClick={onClose}
-                                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     form="edit-asset-form"
-                                    className="flex-[2] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                    className="flex-[2] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
                                 >
                                     <Save className="w-4 h-4" />
                                     Save Changes

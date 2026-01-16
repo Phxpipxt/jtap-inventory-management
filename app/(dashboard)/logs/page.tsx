@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useInventory } from "@/hooks/useInventory";
-import { Search, Filter, Upload, Calendar, X, FileText, User, ArrowUpDown, Plus, Trash2, Pencil, ClipboardCheck } from "lucide-react";
+import { Search, Filter, Upload, Calendar, X, FileText, User, ArrowUpDown, Plus, Trash2, Pencil, ClipboardCheck, Download } from "lucide-react";
 // import * as XLSX from "xlsx";
 import { AlertModal } from "@/components/modals/AlertModal";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
@@ -257,14 +257,14 @@ export default function LogsPage() {
                         )}
                         <button
                             onClick={handleExport}
-                            className="md:hidden flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all active:scale-95 sm:w-auto"
+                            className="md:hidden flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all active:scale-95 sm:w-auto cursor-pointer"
                         >
                             <Upload className="h-4 w-4" />
                             <span>Export</span>
                         </button>
                         <button
                             onClick={handleExport}
-                            className="hidden md:flex group items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
+                            className="hidden md:flex group items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                         >
                             <Upload className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" />
                             <span>Export Report</span>
@@ -283,7 +283,7 @@ export default function LogsPage() {
                                     { id: "Check-in / Check-out", label: "Check-in/Out", icon: ArrowUpDown },
                                     { id: "Disposed", label: "Disposed", icon: Trash2 },
                                     { id: "Audit", label: "Audit", icon: ClipboardCheck },
-                                    { id: "Import", label: "Import", icon: Upload },
+                                    { id: "Import", label: "Import", icon: Download },
                                 ].map((tab) => {
                                     const isActive = actionFilter === tab.id;
                                     const Icon = tab.icon;
@@ -293,7 +293,7 @@ export default function LogsPage() {
                                             key={tab.id}
                                             onClick={() => setActionFilter(tab.id)}
                                             className={`
-                                                relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap z-10
+                                                relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap z-10 cursor-pointer
                                                 ${isActive ? "text-blue-700" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"}
                                             `}
                                         >

@@ -763,7 +763,7 @@ function DisposeContent() {
                                         <div className="grid grid-cols-2 gap-2 mb-3">
                                             <button
                                                 onClick={() => setDisposeMap(prev => ({ ...prev, [asset.id]: { ...config, condition: "Working" } }))}
-                                                className={`flex items-center justify-center p-2 rounded-md border text-sm transition-all ${config.condition === "Working"
+                                                className={`flex items-center justify-center p-2 rounded-md border text-sm transition-all cursor-pointer ${config.condition === "Working"
                                                     ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-bold ring-1 ring-emerald-500"
                                                     : "border-slate-200 hover:border-slate-300 text-slate-600"
                                                     }`}
@@ -772,7 +772,7 @@ function DisposeContent() {
                                             </button>
                                             <button
                                                 onClick={() => setDisposeMap(prev => ({ ...prev, [asset.id]: { ...config, condition: "Not Working" } }))}
-                                                className={`flex items-center justify-center p-2 rounded-md border text-sm transition-all ${config.condition === "Not Working"
+                                                className={`flex items-center justify-center p-2 rounded-md border text-sm transition-all cursor-pointer ${config.condition === "Not Working"
                                                     ? "border-amber-500 bg-amber-50 text-amber-700 font-bold ring-1 ring-amber-500"
                                                     : "border-slate-200 hover:border-slate-300 text-slate-600"
                                                     }`}

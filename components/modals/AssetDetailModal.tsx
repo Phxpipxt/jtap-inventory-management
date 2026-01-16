@@ -229,7 +229,7 @@ export function AssetDetailModal({ asset, isOpen, onClose, onEdit, onHistory, on
                                                                 className="h-full w-full object-contain p-2 transition-transform duration-500 group-hover:scale-105"
                                                             />
                                                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                                                                <button className="p-2 bg-white/90 backdrop-blur rounded-full text-slate-700 shadow-sm hover:text-blue-600 transition-transform hover:scale-110 active:scale-95">
+                                                                <button className="p-2 bg-white/90 backdrop-blur rounded-full text-slate-700 shadow-sm hover:text-blue-600 transition-transform hover:scale-110 active:scale-95 cursor-pointer">
                                                                     <Maximize2 className="h-4 w-4" />
                                                                 </button>
                                                             </div>

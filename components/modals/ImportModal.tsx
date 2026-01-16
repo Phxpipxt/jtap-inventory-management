@@ -353,7 +353,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                                 </div>
                                 <button
                                     onClick={handleClose}
-                                    className="rounded-full p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                                    className="rounded-full p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors cursor-pointer"
                                 >
                                     <X className="h-5 w-5" />
                                 </button>
@@ -371,7 +371,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                                         </h4>
                                         <button
                                             onClick={handleDownloadTemplate}
-                                            className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm border border-slate-200 hover:border-blue-300 hover:text-blue-800 transition-all"
+                                            className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm border border-slate-200 hover:border-blue-300 hover:text-blue-800 transition-all cursor-pointer"
                                         >
                                             <Download className="h-3.5 w-3.5" />
                                             <span className="hidden sm:inline">Download Template</span>
@@ -448,13 +448,13 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                                         <div className="grid grid-cols-2 gap-3 pt-2">
                                             <button
                                                 onClick={handleSkip}
-                                                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm"
+                                                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm cursor-pointer"
                                             >
                                                 Skip Duplicates ({conflicts.length})
                                             </button>
                                             <button
                                                 onClick={handleReplace}
-                                                className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:shadow-blue-500/40 transition-all"
+                                                className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:shadow-blue-500/40 transition-all cursor-pointer"
                                             >
                                                 Replace All
                                             </button>
@@ -484,7 +484,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                                         </div>
                                         <button
                                             onClick={() => setErrors([])}
-                                            className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg hover:bg-slate-800 transition-all"
+                                            className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg hover:bg-slate-800 transition-all cursor-pointer"
                                         >
                                             Try Again
                                         </button>
@@ -535,7 +535,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                                         </p>
                                         <button
                                             onClick={handleClose}
-                                            className="mt-8 w-full max-w-xs rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-[1.02] transition-all"
+                                            className="mt-8 w-full max-w-xs rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-[1.02] transition-all cursor-pointer"
                                         >
                                             Done
                                         </button>

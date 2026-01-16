@@ -125,7 +125,7 @@ export function ExportOptionsModal({ asset, isOpen, onClose }: ExportOptionsModa
                         <h2 className="text-xl font-bold text-slate-900">Export Asset Detail</h2>
                         <p className="text-sm text-slate-500 mt-1">Customize your report and preview the output.</p>
                     </div>
-                    <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+                    <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
                         <X className="h-6 w-6" />
                     </button>
                 </div>
@@ -177,7 +177,7 @@ export function ExportOptionsModal({ asset, isOpen, onClose }: ExportOptionsModa
                             <button
                                 onClick={handleDownloadPdf}
                                 disabled={isGenerating}
-                                className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3.5 text-sm font-bold text-white hover:bg-red-700 shadow-lg shadow-red-200 transition-all hover:shadow-red-300 hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none"
+                                className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3.5 text-sm font-bold text-white hover:bg-red-700 shadow-lg shadow-red-200 transition-all hover:shadow-red-300 hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none cursor-pointer"
                             >
                                 {isGenerating ? (
                                     <span className="flex items-center gap-2">
@@ -193,7 +193,7 @@ export function ExportOptionsModal({ asset, isOpen, onClose }: ExportOptionsModa
                             </button>
                             <button
                                 onClick={handlePrint}
-                                className="hidden sm:flex w-full items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all"
+                                className="hidden sm:flex w-full items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all cursor-pointer"
                             >
                                 <Printer className="h-4 w-4" />
                                 Print

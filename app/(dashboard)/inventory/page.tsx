@@ -758,21 +758,21 @@ function InventoryContent() {
                         <div className="flex w-full items-center gap-2 sm:w-auto">
                             <button
                                 onClick={() => setIsImportModalOpen(true)}
-                                className="group flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm sm:flex-none"
+                                className="group flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm sm:flex-none cursor-pointer"
                             >
                                 <Download className="h-4 w-4" />
                                 <span>Import</span>
                             </button>
                             <button
                                 onClick={handleExport}
-                                className="group flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm sm:flex-none"
+                                className="group flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm sm:flex-none cursor-pointer"
                             >
                                 <Upload className="h-4 w-4" />
                                 <span>Export</span>
                             </button>
                             <button
                                 onClick={() => setIsAddModalOpen(true)}
-                                className="group flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition-all hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] sm:flex-none"
+                                className="group flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition-all hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] sm:flex-none cursor-pointer"
                             >
                                 <Plus className="h-4 w-4 transition-transform group-hover:rotate-90" />
                                 <span className="whitespace-nowrap">Add Asset</span>
